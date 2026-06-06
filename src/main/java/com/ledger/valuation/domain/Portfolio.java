@@ -8,6 +8,7 @@ public final class Portfolio {
 
     private final UUID portfolioId;
     private final String accountCode;
+    private final String tenantId;
     private final AccountValue currentAccountValue;
     private final PortfolioStatus status;
     private final long lastSequenceNumber;
@@ -15,12 +16,14 @@ public final class Portfolio {
     private Portfolio(
             UUID portfolioId,
             String accountCode,
+            String tenantId,
             AccountValue currentAccountValue,
             PortfolioStatus status,
             long lastSequenceNumber
     ) {
         this.portfolioId = Objects.requireNonNull(portfolioId, "portfolioId");
         this.accountCode = Objects.requireNonNull(accountCode, "accountCode");
+        this.tenantId = Objects.requireNonNull(tenantId, "tenantId");
         this.currentAccountValue = Objects.requireNonNull(currentAccountValue, "currentAccountValue");
         this.status = Objects.requireNonNull(status, "status");
         this.lastSequenceNumber = lastSequenceNumber;
@@ -41,6 +44,7 @@ public final class Portfolio {
                 portfolio = new Portfolio(
                         portfolio.portfolioId(),
                         portfolio.accountCode(),
+                        portfolio.tenantId(),
                         new AccountValue(snapshot.currency(), snapshot.accountValueMinorUnits()),
                         portfolio.status(),
                         snapshot.sequenceNumber()
@@ -63,6 +67,10 @@ public final class Portfolio {
 
     public String accountCode() {
         return accountCode;
+    }
+
+    public String tenantId() {
+        return tenantId;
     }
 
     public AccountValue currentAccountValue() {
@@ -122,6 +130,7 @@ public final class Portfolio {
         return new Portfolio(
                 opened.portfolioId(),
                 opened.accountCode(),
+                opened.tenantId(),
                 AccountValue.zero(opened.currency()),
                 opened.status(),
                 opened.sequenceNumber()
@@ -155,6 +164,10 @@ public final class Portfolio {
                     currentAccountValue;
             case PortfolioLedgerEvent.PortfolioStatusChanged ignored ->
                     currentAccountValue;
+            case PortfolioLedgerEvent.PositionOpened ignored ->
+                    currentAccountValue;
+            case PortfolioLedgerEvent.PolicyEvaluated ignored ->
+                    currentAccountValue;
         };
 
         PortfolioStatus nextStatus = switch (eventRecord) {
@@ -162,7 +175,7 @@ public final class Portfolio {
             default -> status;
         };
 
-        return new Portfolio(portfolioId, accountCode, nextAccountValue, nextStatus, eventRecord.sequenceNumber());
+        return new Portfolio(portfolioId, accountCode, tenantId, nextAccountValue, nextStatus, eventRecord.sequenceNumber());
     }
 
     private void assertMonotonicSequence(long incomingSequenceNumber) {

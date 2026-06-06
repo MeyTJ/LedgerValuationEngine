@@ -48,6 +48,7 @@ public class AccountValueDashboardController {
     public record AccountValueDashboardResponse(
             UUID portfolioId,
             String accountCode,
+            String tenantId,
             String currency,
             long accountValueMinorUnits,
             long lastSequenceNumber,
@@ -58,6 +59,7 @@ public class AccountValueDashboardController {
             return new AccountValueDashboardResponse(
                     view.portfolioId(),
                     view.accountCode(),
+                    view.tenantId(),
                     view.currency(),
                     view.accountValueMinorUnits(),
                     view.lastSequenceNumber(),

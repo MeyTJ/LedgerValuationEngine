@@ -1,7 +1,7 @@
 package com.ledger.valuation.interfaces.messaging;
 
-import com.ledger.valuation.application.port.inbound.ProcessCommandUseCase;
-import com.ledger.valuation.domain.Command;
+import com.ledger.valuation.application.service.MarketTickValuationService;
+import com.ledger.valuation.domain.NormalizedMarketTick;
 import com.ledger.valuation.infrastructure.telemetry.OpenTelemetryKafkaConsumerTracing;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -16,17 +16,17 @@ public class NormalizedMarketTickConsumer {
     private static final String CONSUMER_SPAN_NAME = "NormalizedMarketTicks consume";
 
     private final OpenTelemetryKafkaConsumerTracing consumerTracing;
-    private final IngressCommandMapper commandMapper;
-    private final ProcessCommandUseCase processCommandUseCase;
+    private final NormalizedMarketTickMapper tickMapper;
+    private final MarketTickValuationService valuationService;
 
     public NormalizedMarketTickConsumer(
             OpenTelemetryKafkaConsumerTracing consumerTracing,
-            IngressCommandMapper commandMapper,
-            ProcessCommandUseCase processCommandUseCase
+            NormalizedMarketTickMapper tickMapper,
+            MarketTickValuationService valuationService
     ) {
         this.consumerTracing = consumerTracing;
-        this.commandMapper = commandMapper;
-        this.processCommandUseCase = processCommandUseCase;
+        this.tickMapper = tickMapper;
+        this.valuationService = valuationService;
     }
 
     @KafkaListener(
@@ -39,14 +39,13 @@ public class NormalizedMarketTickConsumer {
     }
 
     private void processRecord(ConsumerRecord<String, String> record) {
-        Command command = commandMapper.toCommand(record.value());
+        NormalizedMarketTick tick = tickMapper.toTick(record.value());
         log.debug(
-                "NormalizedMarketTick received topic={} partition={} offset={} type={}",
-                record.topic(),
-                record.partition(),
-                record.offset(),
-                command.getClass().getSimpleName()
+                "NormalizedMarketTick instrument={} price={} runId={}",
+                tick.instrumentId(),
+                tick.priceMinorUnits(),
+                tick.valuationRunId()
         );
-        processCommandUseCase.process(command);
+        valuationService.processTick(tick);
     }
 }

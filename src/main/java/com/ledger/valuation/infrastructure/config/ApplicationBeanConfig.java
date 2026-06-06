@@ -2,39 +2,71 @@ package com.ledger.valuation.infrastructure.config;
 
 import com.ledger.valuation.application.port.inbound.ApplyMarketTickUseCase;
 import com.ledger.valuation.application.port.inbound.CommitTransactionUseCase;
+import com.ledger.valuation.application.port.inbound.CreateAuditExportUseCase;
+import com.ledger.valuation.application.port.inbound.ManageTenantPolicyUseCase;
 import com.ledger.valuation.application.port.inbound.OpenPortfolioUseCase;
 import com.ledger.valuation.application.port.inbound.ProcessCommandUseCase;
+import com.ledger.valuation.application.port.inbound.QueryAccountValueAsOfUseCase;
 import com.ledger.valuation.application.port.inbound.QueryAccountValueDashboardUseCase;
 import com.ledger.valuation.application.port.inbound.QueryAccountValueUseCase;
+import com.ledger.valuation.application.port.inbound.QueryAuditExportUseCase;
 import com.ledger.valuation.application.port.inbound.QueryAuditTrailUseCase;
 import com.ledger.valuation.application.port.inbound.RebuildPortfolioReadSideUseCase;
 import com.ledger.valuation.application.port.inbound.RebuildReadSideUseCase;
+import com.ledger.valuation.application.port.inbound.RegisterPositionUseCase;
 import com.ledger.valuation.application.port.outbound.AccountValueProjectionPort;
 import com.ledger.valuation.application.port.outbound.AccountValueReadModelPort;
+import com.ledger.valuation.application.port.outbound.AsOfReplayCachePort;
 import com.ledger.valuation.application.port.outbound.EventStorePort;
+import com.ledger.valuation.application.port.outbound.InstrumentPositionRegistryPort;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
+import com.ledger.valuation.application.port.outbound.TenantPolicyPort;
 import com.ledger.valuation.application.service.AccrualPostingService;
 import com.ledger.valuation.application.service.ApplyMarketTickService;
 import com.ledger.valuation.application.service.AuditTrailQueryService;
 import com.ledger.valuation.application.service.CommandProcessingService;
 import com.ledger.valuation.application.service.CommitTransactionCommandHandler;
+import com.ledger.valuation.application.service.CreateAuditExportService;
 import com.ledger.valuation.application.service.EventProjectionService;
+import com.ledger.valuation.application.service.ManageTenantPolicyService;
+import com.ledger.valuation.application.service.MarketTickValuationService;
 import com.ledger.valuation.application.service.OpenPortfolioCommandHandler;
 import com.ledger.valuation.application.service.PortfolioLedgerEventProjectionService;
 import com.ledger.valuation.application.service.PortfolioReadSideRebuildService;
+import com.ledger.valuation.application.service.QueryAccountValueAsOfService;
 import com.ledger.valuation.application.service.QueryAccountValueDashboardService;
 import com.ledger.valuation.application.service.QueryAccountValueService;
+import com.ledger.valuation.application.service.QueryAuditExportService;
 import com.ledger.valuation.application.service.ReadSideRebuildService;
+import com.ledger.valuation.application.service.RegisterPositionCommandHandler;
+import com.ledger.valuation.application.service.TenantAccessService;
 import com.ledger.valuation.application.service.UnifiedLedgerCommandHandler;
+import com.ledger.valuation.application.port.outbound.AuditExportJobPort;
+import com.ledger.valuation.application.port.outbound.TenantPortfolioRegistryPort;
 import com.ledger.valuation.domain.LedgerEventFactory;
 import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
+import java.util.UUID;
+import java.util.function.Supplier;
+
 @Configuration
 public class ApplicationBeanConfig {
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    public Supplier<UUID> uuidSupplier() {
+        return UUID::randomUUID;
+    }
 
     @Bean
     public LedgerEventFactory ledgerEventFactory() {
@@ -42,8 +74,8 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
-    public PortfolioLedgerEventFactory portfolioLedgerEventFactory() {
-        return new PortfolioLedgerEventFactory();
+    public PortfolioLedgerEventFactory portfolioLedgerEventFactory(Clock clock, Supplier<UUID> uuidSupplier) {
+        return new PortfolioLedgerEventFactory(clock, uuidSupplier);
     }
 
     @Bean
@@ -51,6 +83,11 @@ public class ApplicationBeanConfig {
             AccountValueReadModelPort readModel
     ) {
         return new PortfolioLedgerEventProjectionService(readModel);
+    }
+
+    @Bean
+    public TenantAccessService tenantAccessService(TenantPortfolioRegistryPort tenantRegistry) {
+        return new TenantAccessService(tenantRegistry);
     }
 
     @Bean
@@ -68,9 +105,37 @@ public class ApplicationBeanConfig {
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
             PortfolioLedgerEventFactory eventFactory,
-            OutboxPort outbox
+            OutboxPort outbox,
+            TenantPolicyPort tenantPolicyPort
     ) {
-        return new CommitTransactionCommandHandler(unitOfWork, portfolioEventStore, eventFactory, outbox);
+        return new CommitTransactionCommandHandler(
+                unitOfWork,
+                portfolioEventStore,
+                eventFactory,
+                outbox,
+                tenantPolicyPort
+        );
+    }
+
+    @Bean
+    public RegisterPositionUseCase registerPositionUseCase(
+            LedgerWriteUnitOfWorkPort unitOfWork,
+            PortfolioEventStorePort portfolioEventStore,
+            PortfolioLedgerEventFactory eventFactory,
+            OutboxPort outbox,
+            InstrumentPositionRegistryPort positionRegistry,
+            Clock clock,
+            Supplier<UUID> uuidSupplier
+    ) {
+        return new RegisterPositionCommandHandler(
+                unitOfWork,
+                portfolioEventStore,
+                eventFactory,
+                outbox,
+                positionRegistry,
+                clock,
+                uuidSupplier
+        );
     }
 
     @Bean
@@ -86,9 +151,18 @@ public class ApplicationBeanConfig {
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
             PortfolioLedgerEventFactory eventFactory,
-            OutboxPort outbox
+            OutboxPort outbox,
+            InstrumentPositionRegistryPort positionRegistry
     ) {
-        return new ApplyMarketTickService(unitOfWork, portfolioEventStore, eventFactory, outbox);
+        return new ApplyMarketTickService(unitOfWork, portfolioEventStore, eventFactory, outbox, positionRegistry);
+    }
+
+    @Bean
+    public MarketTickValuationService marketTickValuationService(
+            InstrumentPositionRegistryPort positionRegistry,
+            ApplyMarketTickUseCase applyMarketTickUseCase
+    ) {
+        return new MarketTickValuationService(positionRegistry, applyMarketTickUseCase);
     }
 
     @Bean
@@ -129,8 +203,38 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
+    public QueryAccountValueAsOfUseCase queryAccountValueAsOfUseCase(
+            PortfolioEventStorePort eventStore,
+            AsOfReplayCachePort asOfReplayCache,
+            Clock clock,
+            MeterRegistry meterRegistry
+    ) {
+        return new QueryAccountValueAsOfService(eventStore, asOfReplayCache, clock, meterRegistry);
+    }
+
+    @Bean
     public QueryAuditTrailUseCase queryAuditTrailUseCase(PortfolioEventStorePort eventStore) {
         return new AuditTrailQueryService(eventStore);
+    }
+
+    @Bean
+    public ManageTenantPolicyUseCase manageTenantPolicyUseCase(TenantPolicyPort tenantPolicyPort) {
+        return new ManageTenantPolicyService(tenantPolicyPort);
+    }
+
+    @Bean
+    public CreateAuditExportUseCase createAuditExportUseCase(
+            AuditExportJobPort jobPort,
+            TenantAccessService tenantAccessService,
+            Clock clock,
+            Supplier<UUID> uuidSupplier
+    ) {
+        return new CreateAuditExportService(jobPort, tenantAccessService, clock, uuidSupplier);
+    }
+
+    @Bean
+    public QueryAuditExportUseCase queryAuditExportUseCase(AuditExportJobPort jobPort) {
+        return new QueryAuditExportService(jobPort);
     }
 
     @Bean

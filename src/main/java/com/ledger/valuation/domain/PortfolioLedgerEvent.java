@@ -13,7 +13,9 @@ public sealed interface PortfolioLedgerEvent permits
         PortfolioLedgerEvent.FxRateCommitted,
         PortfolioLedgerEvent.AccountValueSnapshot,
         PortfolioLedgerEvent.PortfolioStatusChanged,
-        PortfolioLedgerEvent.AccrualPosted {
+        PortfolioLedgerEvent.AccrualPosted,
+        PortfolioLedgerEvent.PositionOpened,
+        PortfolioLedgerEvent.PolicyEvaluated {
 
     UUID eventId();
 
@@ -122,5 +124,26 @@ public sealed interface PortfolioLedgerEvent permits
             long accrualMinorUnits,
             String accrualType,
             String accrualRunId
+    ) implements PortfolioLedgerEvent {}
+
+    record PositionOpened(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            String instrumentId,
+            long quantityMinorUnits,
+            long costBasisMinorUnits
+    ) implements PortfolioLedgerEvent {}
+
+    record PolicyEvaluated(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            String ruleType,
+            String decision,
+            long evaluatedAmountMinorUnits,
+            long thresholdMinorUnits
     ) implements PortfolioLedgerEvent {}
 }

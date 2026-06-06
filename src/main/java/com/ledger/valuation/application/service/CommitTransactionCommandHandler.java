@@ -5,13 +5,18 @@ import com.ledger.valuation.application.port.inbound.CommitTransactionUseCase;
 import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
+import com.ledger.valuation.application.port.outbound.TenantPolicyPort;
 import com.ledger.valuation.domain.CommitTransactionCommand;
+import com.ledger.valuation.domain.PolicyEvaluationResult;
+import com.ledger.valuation.domain.PolicyViolationException;
 import com.ledger.valuation.domain.Portfolio;
 import com.ledger.valuation.domain.PortfolioLedgerEvent;
 import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
 import com.ledger.valuation.domain.PortfolioLedgerEventStream;
 import com.ledger.valuation.domain.PortfolioNotFoundException;
+import com.ledger.valuation.domain.PortfolioPolicyEngine;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class CommitTransactionCommandHandler implements CommitTransactionUseCase {
@@ -20,17 +25,20 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
     private final PortfolioEventStorePort portfolioEventStore;
     private final PortfolioLedgerEventFactory eventFactory;
     private final OutboxPort outbox;
+    private final TenantPolicyPort tenantPolicyPort;
 
     public CommitTransactionCommandHandler(
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
             PortfolioLedgerEventFactory eventFactory,
-            OutboxPort outbox
+            OutboxPort outbox,
+            TenantPolicyPort tenantPolicyPort
     ) {
         this.unitOfWork = unitOfWork;
         this.portfolioEventStore = portfolioEventStore;
         this.eventFactory = eventFactory;
         this.outbox = outbox;
+        this.tenantPolicyPort = tenantPolicyPort;
     }
 
     @Override
@@ -45,6 +53,8 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
         }
 
         Portfolio portfolio = rehydratePortfolio(command.portfolioId());
+        evaluateAndEnforcePolicies(portfolio, command);
+        portfolio = rehydratePortfolio(command.portfolioId());
         portfolio.ensureTransactionCommitPreservesNonNegativeAccountValue(
                 command.creditMinorUnits(),
                 command.debitMinorUnits()
@@ -56,6 +66,32 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
 
         Portfolio resultingPortfolio = portfolio.applyCommittedTransaction(event);
         return CommitTransactionResult.committed(event.eventId(), resultingPortfolio.accountValueMinorUnits());
+    }
+
+    private void evaluateAndEnforcePolicies(Portfolio portfolio, CommitTransactionCommand command) {
+        List<PolicyEvaluationResult> evaluations = PortfolioPolicyEngine.evaluateTransactionCommit(
+                portfolio,
+                command,
+                tenantPolicyPort.findByTenant(portfolio.tenantId())
+        );
+        long nextSequence = portfolio.lastSequenceNumber();
+        for (PolicyEvaluationResult evaluation : evaluations) {
+            nextSequence++;
+            PortfolioLedgerEvent policyEvent = eventFactory.createPolicyEvaluated(
+                    portfolio.portfolioId(),
+                    nextSequence,
+                    evaluation
+            );
+            portfolioEventStore.append(policyEvent);
+            outbox.enqueue(policyEvent);
+            if (evaluation.isDenied()) {
+                throw new PolicyViolationException(
+                        portfolio.portfolioId(),
+                        evaluation.ruleType(),
+                        "Policy " + evaluation.ruleType() + " denied transaction"
+                );
+            }
+        }
     }
 
     private CommitTransactionResult resolveIdempotentReplay(

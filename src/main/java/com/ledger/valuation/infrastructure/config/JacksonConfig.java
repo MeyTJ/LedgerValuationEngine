@@ -28,7 +28,9 @@ public class JacksonConfig {
                 PortfolioLedgerEvent.FxRateCommitted.class,
                 PortfolioLedgerEvent.AccountValueSnapshot.class,
                 PortfolioLedgerEvent.PortfolioStatusChanged.class,
-                PortfolioLedgerEvent.AccrualPosted.class
+                PortfolioLedgerEvent.AccrualPosted.class,
+                PortfolioLedgerEvent.PositionOpened.class,
+                PortfolioLedgerEvent.PolicyEvaluated.class
         );
         return mapper;
     }

@@ -16,15 +16,18 @@ public class ReactiveLedgerEventProjectionListener {
     private final PortfolioLedgerEventProjectionService projectionService;
     private final ReadModelFederationWriter federationWriter;
     private final AccountValueReadModelPort readModel;
+    private final AccountValueStreamPublisher streamPublisher;
 
     public ReactiveLedgerEventProjectionListener(
             PortfolioLedgerEventProjectionService projectionService,
             ReadModelFederationWriter federationWriter,
-            AccountValueReadModelPort readModel
+            AccountValueReadModelPort readModel,
+            AccountValueStreamPublisher streamPublisher
     ) {
         this.projectionService = projectionService;
         this.federationWriter = federationWriter;
         this.readModel = readModel;
+        this.streamPublisher = streamPublisher;
     }
 
     @Async("ledgerProjectionExecutor")
@@ -38,6 +41,9 @@ public class ReactiveLedgerEventProjectionListener {
                 eventRecord.sequenceNumber()
         );
         projectionService.project(eventRecord);
-        readModel.findByPortfolioId(eventRecord.portfolioId()).ifPresent(federationWriter::federate);
+        readModel.findByPortfolioId(eventRecord.portfolioId()).ifPresent(view -> {
+            federationWriter.federate(view);
+            streamPublisher.publish(view);
+        });
     }
 }

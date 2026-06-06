@@ -2,6 +2,7 @@ package com.ledger.valuation.infrastructure.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.ledger.valuation.application.readmodel.AccountValueAsOfView;
 import com.ledger.valuation.application.readmodel.AccountValueDashboardView;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -35,6 +36,17 @@ public class CacheConfig {
     public Cache<String, Long> accountValueCache(
             @Value("${ledger.readside.cache.max-entries}") long maxEntries,
             @Value("${ledger.readside.cache.expire-after-write}") Duration expireAfterWrite
+    ) {
+        return Caffeine.newBuilder()
+                .maximumSize(maxEntries)
+                .expireAfterWrite(expireAfterWrite)
+                .build();
+    }
+
+    @Bean
+    public Cache<String, AccountValueAsOfView> asOfReplayCache(
+            @Value("${ledger.asof.cache.max-entries:10000}") long maxEntries,
+            @Value("${ledger.asof.cache.expire-after-write:PT15M}") Duration expireAfterWrite
     ) {
         return Caffeine.newBuilder()
                 .maximumSize(maxEntries)

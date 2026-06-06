@@ -123,4 +123,21 @@ public final class PortfolioLedgerEventFactory {
                 accrualRunId
         );
     }
+
+    public PortfolioLedgerEvent.PolicyEvaluated createPolicyEvaluated(
+            UUID portfolioId,
+            long sequenceNumber,
+            PolicyEvaluationResult result
+    ) {
+        return new PortfolioLedgerEvent.PolicyEvaluated(
+                idSupplier.get(),
+                portfolioId,
+                sequenceNumber,
+                clock.instant(),
+                result.ruleType().name(),
+                result.decision().name(),
+                result.evaluatedAmountMinorUnits(),
+                result.thresholdMinorUnits()
+        );
+    }
 }

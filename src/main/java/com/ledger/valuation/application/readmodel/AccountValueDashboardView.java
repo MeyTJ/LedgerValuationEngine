@@ -6,6 +6,7 @@ import java.util.UUID;
 public record AccountValueDashboardView(
         UUID portfolioId,
         String accountCode,
+        String tenantId,
         String currency,
         long accountValueMinorUnits,
         long lastSequenceNumber,
@@ -20,6 +21,7 @@ public record AccountValueDashboardView(
         return new AccountValueDashboardView(
                 portfolioId,
                 accountCode,
+                tenantId,
                 currency,
                 nextAccountValueMinorUnits,
                 sequenceNumber,

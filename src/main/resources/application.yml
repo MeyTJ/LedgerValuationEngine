@@ -69,6 +69,19 @@ ledger:
     enabled: ${SNAPSHOT_ENABLED:false}
     compaction-threshold: ${SNAPSHOT_THRESHOLD:1000}
     cron: ${SNAPSHOT_CRON:0 30 3 * * SUN}
+  asof:
+    cache:
+      max-entries: ${ASOF_CACHE_MAX_ENTRIES:10000}
+      expire-after-write: ${ASOF_CACHE_TTL:PT15M}
+  audit:
+    export:
+      storage-path: ${AUDIT_EXPORT_PATH:./data/audit-exports}
+      batch-size: ${AUDIT_EXPORT_BATCH_SIZE:10}
+      worker-interval-ms: ${AUDIT_EXPORT_WORKER_INTERVAL_MS:5000}
+  stream:
+    max-connections: ${SSE_MAX_CONNECTIONS:500}
+  tenant:
+    enforcement: ${TENANT_ENFORCEMENT:false}
 
 management:
   endpoints:

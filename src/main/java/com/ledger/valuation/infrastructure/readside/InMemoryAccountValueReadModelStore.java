@@ -2,6 +2,7 @@ package com.ledger.valuation.infrastructure.readside;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.ledger.valuation.application.port.outbound.AccountValueReadModelPort;
+import com.ledger.valuation.application.port.outbound.TenantPortfolioRegistryPort;
 import com.ledger.valuation.application.readmodel.AccountValueDashboardView;
 import com.ledger.valuation.domain.PortfolioLedgerEvent;
 import org.springframework.stereotype.Component;
@@ -17,13 +18,16 @@ public class InMemoryAccountValueReadModelStore implements AccountValueReadModel
     private final Cache<String, AccountValueDashboardView> accountCodeIndex;
     private final Cache<UUID, AccountValueDashboardView> portfolioIdIndex;
     private final ConcurrentHashMap<UUID, AccountValueDashboardView> dashboardShard;
+    private final TenantPortfolioRegistryPort tenantRegistry;
 
     public InMemoryAccountValueReadModelStore(
             Cache<String, AccountValueDashboardView> accountCodeIndex,
-            Cache<UUID, AccountValueDashboardView> portfolioIdIndex
+            Cache<UUID, AccountValueDashboardView> portfolioIdIndex,
+            TenantPortfolioRegistryPort tenantRegistry
     ) {
         this.accountCodeIndex = accountCodeIndex;
         this.portfolioIdIndex = portfolioIdIndex;
+        this.tenantRegistry = tenantRegistry;
         this.dashboardShard = new ConcurrentHashMap<>();
     }
 
@@ -72,6 +76,8 @@ public class InMemoryAccountValueReadModelStore implements AccountValueReadModel
             case PortfolioLedgerEvent.AccountValueSnapshot snapshot -> projectSnapshot(snapshot);
             case PortfolioLedgerEvent.FxRateCommitted ignored -> { }
             case PortfolioLedgerEvent.PortfolioStatusChanged ignored -> { }
+            case PortfolioLedgerEvent.PositionOpened ignored -> { }
+            case PortfolioLedgerEvent.PolicyEvaluated ignored -> { }
         }
     }
 
@@ -103,11 +109,13 @@ public class InMemoryAccountValueReadModelStore implements AccountValueReadModel
         AccountValueDashboardView view = new AccountValueDashboardView(
                 opened.portfolioId(),
                 opened.accountCode(),
+                opened.tenantId(),
                 opened.currency(),
                 0L,
                 opened.sequenceNumber(),
                 opened.occurredAt()
         );
+        tenantRegistry.register(opened.portfolioId(), opened.tenantId());
         storeView(view);
     }
 

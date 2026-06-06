@@ -3,6 +3,9 @@ package com.ledger.valuation.application.service;
 import com.ledger.valuation.application.model.CommitTransactionResult;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
+import com.ledger.valuation.application.port.outbound.TenantPolicyPort;
+import com.ledger.valuation.domain.PolicyRuleType;
+import com.ledger.valuation.domain.TenantPolicy;
 import com.ledger.valuation.domain.CommitTransactionCommand;
 import com.ledger.valuation.domain.PortfolioLedgerEvent;
 import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
@@ -12,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
@@ -39,7 +43,8 @@ class CommitTransactionCommandHandlerTest {
                         Optional.of(existing)
                 ),
                 new PortfolioLedgerEventFactory(),
-                new NoOpOutbox()
+                new NoOpOutbox(),
+                new EmptyTenantPolicyPort()
         );
 
         CommitTransactionResult result = handler.handle(new CommitTransactionCommand(
@@ -61,7 +66,8 @@ class CommitTransactionCommandHandlerTest {
                 operation -> operation.get(),
                 new StubPortfolioEventStore(new PortfolioLedgerEventStream(List.of(opened)), Optional.empty()),
                 new PortfolioLedgerEventFactory(),
-                new NoOpOutbox()
+                new NoOpOutbox(),
+                new EmptyTenantPolicyPort()
         );
 
         assertThrows(com.ledger.valuation.domain.InsufficientFundsException.class, () ->
@@ -95,6 +101,19 @@ class CommitTransactionCommandHandlerTest {
 
         @Override
         public void append(PortfolioLedgerEvent event) {}
+    }
+
+    private static final class EmptyTenantPolicyPort implements TenantPolicyPort {
+        @Override
+        public List<TenantPolicy> findByTenant(String tenantId) {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public void upsert(TenantPolicy policy) {}
+
+        @Override
+        public void delete(String tenantId, PolicyRuleType ruleType) {}
     }
 
     private static final class NoOpOutbox implements OutboxPort {
