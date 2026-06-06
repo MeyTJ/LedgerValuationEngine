@@ -18,6 +18,19 @@ public final class PortfolioLedgerEventFactory {
         this(Clock.systemUTC(), UUID::randomUUID);
     }
 
+    public PortfolioLedgerEvent.PortfolioAccountOpened createPortfolioOpened(OpenPortfolioCommand command) {
+        return new PortfolioLedgerEvent.PortfolioAccountOpened(
+                idSupplier.get(),
+                command.portfolioId(),
+                1L,
+                clock.instant(),
+                command.accountCode(),
+                command.currency(),
+                command.tenantId(),
+                PortfolioStatus.ACTIVE
+        );
+    }
+
     public PortfolioLedgerEvent.TransactionCommitted createTransactionCommitted(
             Portfolio portfolio,
             CommitTransactionCommand command
@@ -31,6 +44,83 @@ public final class PortfolioLedgerEventFactory {
                 command.debitMinorUnits(),
                 command.transactionReference(),
                 command.idempotencyToken()
+        );
+    }
+
+    public PortfolioLedgerEvent.MarkToMarketApplied createMarkToMarket(
+            Portfolio portfolio,
+            NormalizedMarketTick tick,
+            long markToMarketDeltaMinorUnits
+    ) {
+        return new PortfolioLedgerEvent.MarkToMarketApplied(
+                idSupplier.get(),
+                portfolio.portfolioId(),
+                portfolio.lastSequenceNumber() + 1L,
+                clock.instant(),
+                tick.instrumentId(),
+                markToMarketDeltaMinorUnits,
+                tick.valuationRunId()
+        );
+    }
+
+    public PortfolioLedgerEvent.FxRateCommitted createFxRateCommitted(
+            Portfolio portfolio,
+            FxRate fxRate
+    ) {
+        return new PortfolioLedgerEvent.FxRateCommitted(
+                idSupplier.get(),
+                portfolio.portfolioId(),
+                portfolio.lastSequenceNumber() + 1L,
+                clock.instant(),
+                fxRate.baseCurrency(),
+                fxRate.quoteCurrency(),
+                fxRate.rateMinorUnits(),
+                fxRate.scale()
+        );
+    }
+
+    public PortfolioLedgerEvent.AccountValueSnapshot createAccountValueSnapshot(Portfolio portfolio) {
+        return new PortfolioLedgerEvent.AccountValueSnapshot(
+                idSupplier.get(),
+                portfolio.portfolioId(),
+                portfolio.lastSequenceNumber() + 1L,
+                clock.instant(),
+                portfolio.accountValueMinorUnits(),
+                portfolio.accountValueCurrency()
+        );
+    }
+
+    public PortfolioLedgerEvent.FeeAccrued createFeeAccrued(
+            Portfolio portfolio,
+            long feeMinorUnits,
+            String feeCategory,
+            String accrualRunId
+    ) {
+        return new PortfolioLedgerEvent.FeeAccrued(
+                idSupplier.get(),
+                portfolio.portfolioId(),
+                portfolio.lastSequenceNumber() + 1L,
+                clock.instant(),
+                feeMinorUnits,
+                feeCategory,
+                accrualRunId
+        );
+    }
+
+    public PortfolioLedgerEvent.InterestCredited createInterestCredited(
+            Portfolio portfolio,
+            long interestMinorUnits,
+            String interestPeriod,
+            String accrualRunId
+    ) {
+        return new PortfolioLedgerEvent.InterestCredited(
+                idSupplier.get(),
+                portfolio.portfolioId(),
+                portfolio.lastSequenceNumber() + 1L,
+                clock.instant(),
+                interestMinorUnits,
+                interestPeriod,
+                accrualRunId
         );
     }
 }

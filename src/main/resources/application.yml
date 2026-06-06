@@ -39,21 +39,51 @@ ledger:
     market-ticks-topic: ${NORMALIZED_MARKET_TICKS_TOPIC:NormalizedMarketTicks}
     market-ticks-group-id: ${NORMALIZED_MARKET_TICKS_GROUP_ID:ledger-valuation-market-ticks}
     market-ticks-concurrency: ${NORMALIZED_MARKET_TICKS_CONCURRENCY:4}
+    dlq-topic: ${NORMALIZED_MARKET_TICKS_DLQ:NormalizedMarketTicks.dlq}
   readside:
     cache:
       max-entries: ${READ_CACHE_MAX_ENTRIES:100000}
       expire-after-write: ${READ_CACHE_TTL:PT1H}
     local-only: true
+    warmup-on-startup: ${READ_MODEL_WARMUP:true}
   tomcat:
     max-connections: ${TOMCAT_MAX_CONNECTIONS:10000}
+  outbox:
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
+    relay-interval-ms: ${OUTBOX_RELAY_INTERVAL_MS:500}
+  cockroach:
+    retry:
+      max-attempts: ${COCKROACH_RETRY_MAX:5}
+      base-backoff-ms: ${COCKROACH_RETRY_BACKOFF_MS:25}
+  reconciliation:
+    interval-ms: ${RECONCILIATION_INTERVAL_MS:30000}
+  accrual:
+    enabled: ${ACCRUAL_ENABLED:false}
+    cron: ${ACCRUAL_CRON:0 0 2 * * *}
+    default-fee-minor-units: ${ACCRUAL_DEFAULT_FEE:100}
+  sharding:
+    shard-count: ${SHARD_COUNT:16}
+  security:
+    enabled: ${SECURITY_ENABLED:false}
+  snapshot:
+    enabled: ${SNAPSHOT_ENABLED:false}
+    compaction-threshold: ${SNAPSHOT_THRESHOLD:1000}
+    cron: ${SNAPSHOT_CRON:0 30 3 * * SUN}
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics,info
   tracing:
     sampling:
       probability: 1.0
   otlp:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   level:

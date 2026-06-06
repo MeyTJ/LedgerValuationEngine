@@ -50,6 +50,12 @@ public class CockroachJdbcEventStore implements EventStore {
             LIMIT 1
             """;
 
+    static final String LIST_AGGREGATE_IDS_SQL = """
+            SELECT DISTINCT aggregate_id
+            FROM event_store
+            ORDER BY aggregate_id
+            """;
+
     private final DataSource dataSource;
 
     public CockroachJdbcEventStore(DataSource dataSource) {
@@ -122,6 +128,27 @@ public class CockroachJdbcEventStore implements EventStore {
     }
 
     @Override
+    public List<UUID> listAggregateIds() {
+        EventStoreSqlGuard.assertReadOnlySelect(LIST_AGGREGATE_IDS_SQL);
+        Connection connection = DataSourceUtils.getConnection(dataSource);
+        try {
+            enforceSerializableIsolation(connection);
+            try (PreparedStatement statement = connection.prepareStatement(LIST_AGGREGATE_IDS_SQL);
+                 ResultSet resultSet = statement.executeQuery()) {
+                var ids = new ArrayList<UUID>();
+                while (resultSet.next()) {
+                    ids.add(resultSet.getObject("aggregate_id", UUID.class));
+                }
+                return ids;
+            }
+        } catch (SQLException ex) {
+            throw mapSqlException(ex, "Failed to list aggregate ids");
+        } finally {
+            DataSourceUtils.releaseConnection(connection, dataSource);
+        }
+    }
+
+    @Override
     public boolean existsByAggregateIdAndSequenceNumber(UUID aggregateId, long sequenceNumber) {
         EventStoreSqlGuard.assertReadOnlySelect(EXISTS_BY_AGGREGATE_AND_SEQUENCE_SQL);
 
@@ -177,12 +204,24 @@ public class CockroachJdbcEventStore implements EventStore {
         );
     }
 
+    static boolean isSerializationConflict(SQLException ex) {
+        for (SQLException current = ex; current != null; current = current.getNextException()) {
+            if ("40001".equals(current.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static RuntimeException mapSqlException(SQLException ex, String message) {
         if (isImmutabilityViolation(ex)) {
             return new ImmutableLedgerViolationException(
                     "event_store immutability constraint violated: " + ex.getMessage(),
                     ex
             );
+        }
+        if (isSerializationConflict(ex)) {
+            return new CockroachSerializationConflictException(message, ex);
         }
         return new IllegalStateException(message, ex);
     }

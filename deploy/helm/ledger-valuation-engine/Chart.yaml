@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ledger-valuation-engine
+description: LedgerValuationEngine event-sourced valuation platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

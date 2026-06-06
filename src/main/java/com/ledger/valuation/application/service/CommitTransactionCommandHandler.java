@@ -2,8 +2,8 @@ package com.ledger.valuation.application.service;
 
 import com.ledger.valuation.application.model.CommitTransactionResult;
 import com.ledger.valuation.application.port.inbound.CommitTransactionUseCase;
-import com.ledger.valuation.application.port.outbound.LedgerEventCommittedPublisherPort;
 import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
+import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.domain.CommitTransactionCommand;
 import com.ledger.valuation.domain.Portfolio;
@@ -19,18 +19,18 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
     private final LedgerWriteUnitOfWorkPort unitOfWork;
     private final PortfolioEventStorePort portfolioEventStore;
     private final PortfolioLedgerEventFactory eventFactory;
-    private final LedgerEventCommittedPublisherPort eventCommittedPublisher;
+    private final OutboxPort outbox;
 
     public CommitTransactionCommandHandler(
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
             PortfolioLedgerEventFactory eventFactory,
-            LedgerEventCommittedPublisherPort eventCommittedPublisher
+            OutboxPort outbox
     ) {
         this.unitOfWork = unitOfWork;
         this.portfolioEventStore = portfolioEventStore;
         this.eventFactory = eventFactory;
-        this.eventCommittedPublisher = eventCommittedPublisher;
+        this.outbox = outbox;
     }
 
     @Override
@@ -52,7 +52,7 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
 
         PortfolioLedgerEvent.TransactionCommitted event = eventFactory.createTransactionCommitted(portfolio, command);
         portfolioEventStore.append(event);
-        eventCommittedPublisher.publish(event);
+        outbox.enqueue(event);
 
         Portfolio resultingPortfolio = portfolio.applyCommittedTransaction(event);
         return CommitTransactionResult.committed(event.eventId(), resultingPortfolio.accountValueMinorUnits());

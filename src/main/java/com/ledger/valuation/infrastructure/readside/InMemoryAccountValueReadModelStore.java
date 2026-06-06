@@ -57,7 +57,31 @@ public class InMemoryAccountValueReadModelStore implements AccountValueReadModel
                     adjustment.occurredAt(),
                     current -> current.accountValueMinorUnits() + adjustment.accountValueDeltaMinorUnits()
             );
+            case PortfolioLedgerEvent.MarkToMarketApplied mark -> projectMutation(
+                    mark.portfolioId(),
+                    mark.sequenceNumber(),
+                    mark.occurredAt(),
+                    current -> current.accountValueMinorUnits() + mark.markToMarketDeltaMinorUnits()
+            );
+            case PortfolioLedgerEvent.AccrualPosted accrual -> projectMutation(
+                    accrual.portfolioId(),
+                    accrual.sequenceNumber(),
+                    accrual.occurredAt(),
+                    current -> current.accountValueMinorUnits() + accrual.accrualMinorUnits()
+            );
+            case PortfolioLedgerEvent.AccountValueSnapshot snapshot -> projectSnapshot(snapshot);
+            case PortfolioLedgerEvent.FxRateCommitted ignored -> { }
+            case PortfolioLedgerEvent.PortfolioStatusChanged ignored -> { }
         }
+    }
+
+    private void projectSnapshot(PortfolioLedgerEvent.AccountValueSnapshot snapshot) {
+        projectMutation(
+                snapshot.portfolioId(),
+                snapshot.sequenceNumber(),
+                snapshot.occurredAt(),
+                _ -> snapshot.accountValueMinorUnits()
+        );
     }
 
     @Override

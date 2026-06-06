@@ -9,17 +9,20 @@ public final class Portfolio {
     private final UUID portfolioId;
     private final String accountCode;
     private final AccountValue currentAccountValue;
+    private final PortfolioStatus status;
     private final long lastSequenceNumber;
 
     private Portfolio(
             UUID portfolioId,
             String accountCode,
             AccountValue currentAccountValue,
+            PortfolioStatus status,
             long lastSequenceNumber
     ) {
         this.portfolioId = Objects.requireNonNull(portfolioId, "portfolioId");
         this.accountCode = Objects.requireNonNull(accountCode, "accountCode");
         this.currentAccountValue = Objects.requireNonNull(currentAccountValue, "currentAccountValue");
+        this.status = Objects.requireNonNull(status, "status");
         this.lastSequenceNumber = lastSequenceNumber;
     }
 
@@ -31,9 +34,25 @@ public final class Portfolio {
 
         Portfolio portfolio = null;
         for (PortfolioLedgerEvent eventRecord : chronologicalEventRecords) {
+            if (eventRecord instanceof PortfolioLedgerEvent.AccountValueSnapshot snapshot) {
+                if (portfolio == null) {
+                    throw new IllegalStateException("AccountValueSnapshot requires prior portfolio context");
+                }
+                portfolio = new Portfolio(
+                        portfolio.portfolioId(),
+                        portfolio.accountCode(),
+                        new AccountValue(snapshot.currency(), snapshot.accountValueMinorUnits()),
+                        portfolio.status(),
+                        snapshot.sequenceNumber()
+                );
+                continue;
+            }
             portfolio = portfolio == null
                     ? openFromFirstEventRecord(eventRecord)
                     : portfolio.applyEventRecord(eventRecord);
+        }
+        if (portfolio == null) {
+            throw new IllegalStateException("Unable to rehydrate portfolio from event records");
         }
         return portfolio;
     }
@@ -50,6 +69,10 @@ public final class Portfolio {
         return currentAccountValue;
     }
 
+    public PortfolioStatus status() {
+        return status;
+    }
+
     public long accountValueMinorUnits() {
         return currentAccountValue.accountValueMinorUnits();
     }
@@ -62,12 +85,15 @@ public final class Portfolio {
         return lastSequenceNumber;
     }
 
-    public AccountValue projectAccountValueAfterTransactionCommit(long creditMinorUnits, long debitMinorUnits) {
-        if (creditMinorUnits < 0L) {
-            throw new IllegalArgumentException("creditMinorUnits must be non-negative");
+    public void ensureActive() {
+        if (status != PortfolioStatus.ACTIVE) {
+            throw new IllegalStateException("Portfolio " + portfolioId + " is not ACTIVE; status=" + status);
         }
-        if (debitMinorUnits < 0L) {
-            throw new IllegalArgumentException("debitMinorUnits must be non-negative");
+    }
+
+    public AccountValue projectAccountValueAfterTransactionCommit(long creditMinorUnits, long debitMinorUnits) {
+        if (creditMinorUnits < 0L || debitMinorUnits < 0L) {
+            throw new IllegalArgumentException("creditMinorUnits and debitMinorUnits must be non-negative");
         }
         return currentAccountValue.applyCredit(creditMinorUnits).applyDebit(debitMinorUnits);
     }
@@ -97,6 +123,7 @@ public final class Portfolio {
                 opened.portfolioId(),
                 opened.accountCode(),
                 AccountValue.zero(opened.currency()),
+                opened.status(),
                 opened.sequenceNumber()
         );
     }
@@ -118,9 +145,24 @@ public final class Portfolio {
                     currentAccountValue.applyCredit(interest.interestMinorUnits());
             case PortfolioLedgerEvent.AccountValueAdjustmentPosted adjustment ->
                     currentAccountValue.applyAccountValueDelta(adjustment.accountValueDeltaMinorUnits());
+            case PortfolioLedgerEvent.MarkToMarketApplied mark ->
+                    currentAccountValue.applyAccountValueDelta(mark.markToMarketDeltaMinorUnits());
+            case PortfolioLedgerEvent.AccrualPosted accrual ->
+                    currentAccountValue.applyAccountValueDelta(accrual.accrualMinorUnits());
+            case PortfolioLedgerEvent.AccountValueSnapshot snapshot ->
+                    new AccountValue(snapshot.currency(), snapshot.accountValueMinorUnits());
+            case PortfolioLedgerEvent.FxRateCommitted ignored ->
+                    currentAccountValue;
+            case PortfolioLedgerEvent.PortfolioStatusChanged ignored ->
+                    currentAccountValue;
         };
 
-        return new Portfolio(portfolioId, accountCode, nextAccountValue, eventRecord.sequenceNumber());
+        PortfolioStatus nextStatus = switch (eventRecord) {
+            case PortfolioLedgerEvent.PortfolioStatusChanged changed -> changed.newStatus();
+            default -> status;
+        };
+
+        return new Portfolio(portfolioId, accountCode, nextAccountValue, nextStatus, eventRecord.sequenceNumber());
     }
 
     private void assertMonotonicSequence(long incomingSequenceNumber) {

@@ -13,4 +13,6 @@ public interface EventStore {
     Optional<StoredEventRecord> findByIdempotencyToken(String idempotencyToken);
 
     boolean existsByAggregateIdAndSequenceNumber(UUID aggregateId, long sequenceNumber);
+
+    List<UUID> listAggregateIds();
 }

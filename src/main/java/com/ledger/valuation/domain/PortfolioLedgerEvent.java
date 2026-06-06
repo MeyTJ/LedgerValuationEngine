@@ -8,7 +8,12 @@ public sealed interface PortfolioLedgerEvent permits
         PortfolioLedgerEvent.TransactionCommitted,
         PortfolioLedgerEvent.FeeAccrued,
         PortfolioLedgerEvent.InterestCredited,
-        PortfolioLedgerEvent.AccountValueAdjustmentPosted {
+        PortfolioLedgerEvent.AccountValueAdjustmentPosted,
+        PortfolioLedgerEvent.MarkToMarketApplied,
+        PortfolioLedgerEvent.FxRateCommitted,
+        PortfolioLedgerEvent.AccountValueSnapshot,
+        PortfolioLedgerEvent.PortfolioStatusChanged,
+        PortfolioLedgerEvent.AccrualPosted {
 
     UUID eventId();
 
@@ -24,7 +29,9 @@ public sealed interface PortfolioLedgerEvent permits
             long sequenceNumber,
             Instant occurredAt,
             String accountCode,
-            String currency
+            String currency,
+            String tenantId,
+            PortfolioStatus status
     ) implements PortfolioLedgerEvent {}
 
     record TransactionCommitted(
@@ -44,7 +51,8 @@ public sealed interface PortfolioLedgerEvent permits
             long sequenceNumber,
             Instant occurredAt,
             long feeMinorUnits,
-            String feeCategory
+            String feeCategory,
+            String accrualRunId
     ) implements PortfolioLedgerEvent {}
 
     record InterestCredited(
@@ -53,7 +61,8 @@ public sealed interface PortfolioLedgerEvent permits
             long sequenceNumber,
             Instant occurredAt,
             long interestMinorUnits,
-            String interestPeriod
+            String interestPeriod,
+            String accrualRunId
     ) implements PortfolioLedgerEvent {}
 
     record AccountValueAdjustmentPosted(
@@ -63,5 +72,55 @@ public sealed interface PortfolioLedgerEvent permits
             Instant occurredAt,
             long accountValueDeltaMinorUnits,
             String adjustmentReason
+    ) implements PortfolioLedgerEvent {}
+
+    record MarkToMarketApplied(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            String instrumentId,
+            long markToMarketDeltaMinorUnits,
+            String valuationRunId
+    ) implements PortfolioLedgerEvent {}
+
+    record FxRateCommitted(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            String baseCurrency,
+            String quoteCurrency,
+            long rateMinorUnits,
+            int rateScale
+    ) implements PortfolioLedgerEvent {}
+
+    record AccountValueSnapshot(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            long accountValueMinorUnits,
+            String currency
+    ) implements PortfolioLedgerEvent {}
+
+    record PortfolioStatusChanged(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            PortfolioStatus previousStatus,
+            PortfolioStatus newStatus,
+            String reason
+    ) implements PortfolioLedgerEvent {}
+
+    record AccrualPosted(
+            UUID eventId,
+            UUID portfolioId,
+            long sequenceNumber,
+            Instant occurredAt,
+            long accrualMinorUnits,
+            String accrualType,
+            String accrualRunId
     ) implements PortfolioLedgerEvent {}
 }

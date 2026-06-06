@@ -33,6 +33,11 @@ public class CockroachEventStoreAdapter implements EventStorePort {
     }
 
     @Override
+    public List<UUID> listAggregateIds() {
+        return eventStore.listAggregateIds();
+    }
+
+    @Override
     public EventStream loadStream(UUID aggregateId) {
         List<StoredEventRecord> records = eventStore.loadByAggregateId(aggregateId);
         var events = new ArrayList<DomainEvent>(records.size());
