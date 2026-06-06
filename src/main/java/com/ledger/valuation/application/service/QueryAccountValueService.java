@@ -1,18 +1,20 @@
 package com.ledger.valuation.application.service;
 
 import com.ledger.valuation.application.port.inbound.QueryAccountValueUseCase;
-import com.ledger.valuation.application.port.outbound.AccountValueProjectionPort;
+import com.ledger.valuation.application.port.outbound.AccountValueReadModelPort;
 
 public final class QueryAccountValueService implements QueryAccountValueUseCase {
 
-    private final AccountValueProjectionPort projectionPort;
+    private final AccountValueReadModelPort readModel;
 
-    public QueryAccountValueService(AccountValueProjectionPort projectionPort) {
-        this.projectionPort = projectionPort;
+    public QueryAccountValueService(AccountValueReadModelPort readModel) {
+        this.readModel = readModel;
     }
 
     @Override
     public Long getAccountValue(String accountCode) {
-        return projectionPort.getAccountValue(accountCode);
+        return readModel.findByAccountCode(accountCode)
+                .map(view -> view.accountValueMinorUnits())
+                .orElse(null);
     }
 }

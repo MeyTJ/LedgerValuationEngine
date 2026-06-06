@@ -26,5 +26,5 @@ public class AccountValueController {
         return ResponseEntity.ok(new AccountValueResponse(accountCode, value));
     }
 
-    public record AccountValueResponse(String accountCode, long balanceMinorUnits) {}
+    public record AccountValueResponse(String accountCode, long accountValueMinorUnits) {}
 }

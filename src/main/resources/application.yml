@@ -36,10 +36,14 @@ server:
 ledger:
   ingress:
     topic: ${SIGNAL_INGRESS_TOPIC:signal-ingress}
+    market-ticks-topic: ${NORMALIZED_MARKET_TICKS_TOPIC:NormalizedMarketTicks}
+    market-ticks-group-id: ${NORMALIZED_MARKET_TICKS_GROUP_ID:ledger-valuation-market-ticks}
+    market-ticks-concurrency: ${NORMALIZED_MARKET_TICKS_CONCURRENCY:4}
   readside:
     cache:
       max-entries: ${READ_CACHE_MAX_ENTRIES:100000}
       expire-after-write: ${READ_CACHE_TTL:PT1H}
+    local-only: true
   tomcat:
     max-connections: ${TOMCAT_MAX_CONNECTIONS:10000}
 

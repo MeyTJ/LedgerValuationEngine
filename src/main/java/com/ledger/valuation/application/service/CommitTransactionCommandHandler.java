@@ -2,6 +2,7 @@ package com.ledger.valuation.application.service;
 
 import com.ledger.valuation.application.model.CommitTransactionResult;
 import com.ledger.valuation.application.port.inbound.CommitTransactionUseCase;
+import com.ledger.valuation.application.port.outbound.LedgerEventCommittedPublisherPort;
 import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.domain.CommitTransactionCommand;
@@ -18,15 +19,18 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
     private final LedgerWriteUnitOfWorkPort unitOfWork;
     private final PortfolioEventStorePort portfolioEventStore;
     private final PortfolioLedgerEventFactory eventFactory;
+    private final LedgerEventCommittedPublisherPort eventCommittedPublisher;
 
     public CommitTransactionCommandHandler(
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
-            PortfolioLedgerEventFactory eventFactory
+            PortfolioLedgerEventFactory eventFactory,
+            LedgerEventCommittedPublisherPort eventCommittedPublisher
     ) {
         this.unitOfWork = unitOfWork;
         this.portfolioEventStore = portfolioEventStore;
         this.eventFactory = eventFactory;
+        this.eventCommittedPublisher = eventCommittedPublisher;
     }
 
     @Override
@@ -48,6 +52,7 @@ public final class CommitTransactionCommandHandler implements CommitTransactionU
 
         PortfolioLedgerEvent.TransactionCommitted event = eventFactory.createTransactionCommitted(portfolio, command);
         portfolioEventStore.append(event);
+        eventCommittedPublisher.publish(event);
 
         Portfolio resultingPortfolio = portfolio.applyCommittedTransaction(event);
         return CommitTransactionResult.committed(event.eventId(), resultingPortfolio.accountValueMinorUnits());
