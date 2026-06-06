@@ -62,6 +62,31 @@ public final class Portfolio {
         return lastSequenceNumber;
     }
 
+    public AccountValue projectAccountValueAfterTransactionCommit(long creditMinorUnits, long debitMinorUnits) {
+        if (creditMinorUnits < 0L) {
+            throw new IllegalArgumentException("creditMinorUnits must be non-negative");
+        }
+        if (debitMinorUnits < 0L) {
+            throw new IllegalArgumentException("debitMinorUnits must be non-negative");
+        }
+        return currentAccountValue.applyCredit(creditMinorUnits).applyDebit(debitMinorUnits);
+    }
+
+    public void ensureTransactionCommitPreservesNonNegativeAccountValue(long creditMinorUnits, long debitMinorUnits) {
+        AccountValue projectedAccountValue = projectAccountValueAfterTransactionCommit(creditMinorUnits, debitMinorUnits);
+        if (projectedAccountValue.accountValueMinorUnits() < 0L) {
+            throw new InsufficientFundsException(
+                    portfolioId,
+                    currentAccountValue.accountValueMinorUnits(),
+                    projectedAccountValue.accountValueMinorUnits()
+            );
+        }
+    }
+
+    public Portfolio applyCommittedTransaction(PortfolioLedgerEvent.TransactionCommitted committed) {
+        return applyEventRecord(committed);
+    }
+
     private static Portfolio openFromFirstEventRecord(PortfolioLedgerEvent eventRecord) {
         if (!(eventRecord instanceof PortfolioLedgerEvent.PortfolioAccountOpened opened)) {
             throw new IllegalStateException(

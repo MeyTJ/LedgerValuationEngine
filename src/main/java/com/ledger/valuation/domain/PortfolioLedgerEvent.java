@@ -34,7 +34,8 @@ public sealed interface PortfolioLedgerEvent permits
             Instant occurredAt,
             long creditMinorUnits,
             long debitMinorUnits,
-            String transactionReference
+            String transactionReference,
+            String idempotencyToken
     ) implements PortfolioLedgerEvent {}
 
     record FeeAccrued(

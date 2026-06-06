@@ -2,6 +2,7 @@ package com.ledger.valuation.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledger.valuation.domain.DomainEvent;
+import com.ledger.valuation.domain.PortfolioLedgerEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -17,7 +18,12 @@ public class JacksonConfig {
         mapper.registerSubtypes(
                 DomainEvent.AccountOpened.class,
                 DomainEvent.TransactionPosted.class,
-                DomainEvent.AccountValued.class
+                DomainEvent.AccountValued.class,
+                PortfolioLedgerEvent.PortfolioAccountOpened.class,
+                PortfolioLedgerEvent.TransactionCommitted.class,
+                PortfolioLedgerEvent.FeeAccrued.class,
+                PortfolioLedgerEvent.InterestCredited.class,
+                PortfolioLedgerEvent.AccountValueAdjustmentPosted.class
         );
         return mapper;
     }
