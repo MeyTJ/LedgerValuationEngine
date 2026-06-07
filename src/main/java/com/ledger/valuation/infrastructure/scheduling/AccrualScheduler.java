@@ -1,40 +1,41 @@
 package com.ledger.valuation.infrastructure.scheduling;
 
-import com.ledger.valuation.application.port.outbound.EventStorePort;
+import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.application.service.AccrualPostingService;
-import org.springframework.beans.factory.annotation.Value;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Component
 public class AccrualScheduler {
 
     private final AccrualPostingService accrualPostingService;
-    private final EventStorePort eventStore;
+    private final PortfolioEventStorePort portfolioEventStore;
     private final long defaultFeeMinorUnits;
     private final boolean enabled;
 
     public AccrualScheduler(
             AccrualPostingService accrualPostingService,
-            EventStorePort eventStore,
-            @Value("${ledger.accrual.default-fee-minor-units:100}") long defaultFeeMinorUnits,
-            @Value("${ledger.accrual.enabled:false}") boolean enabled
+            PortfolioEventStorePort portfolioEventStore,
+            com.ledger.valuation.infrastructure.config.LedgerProperties ledgerProperties
     ) {
         this.accrualPostingService = accrualPostingService;
-        this.eventStore = eventStore;
-        this.defaultFeeMinorUnits = defaultFeeMinorUnits;
-        this.enabled = enabled;
+        this.portfolioEventStore = portfolioEventStore;
+        this.defaultFeeMinorUnits = ledgerProperties.accrual().defaultFeeMinorUnits();
+        this.enabled = ledgerProperties.accrual().enabled();
     }
 
     @Scheduled(cron = "${ledger.accrual.cron:0 0 2 * * *}")
+    @SchedulerLock(name = "accrualScheduler", lockAtMostFor = "PT30M", lockAtLeastFor = "PT1M")
     public void runDailyAccruals() {
         if (!enabled) {
             return;
         }
-        String runId = UUID.randomUUID().toString();
-        for (UUID portfolioId : eventStore.listAggregateIds()) {
+        String runId = LocalDate.now().toString();
+        for (UUID portfolioId : portfolioEventStore.listPortfolioIds()) {
             accrualPostingService.postFee(portfolioId, defaultFeeMinorUnits, "SCHEDULED_MANAGEMENT_FEE", runId);
         }
     }

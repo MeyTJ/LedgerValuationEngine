@@ -5,6 +5,7 @@ import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.application.service.PortfolioLedgerEventProjectionService;
 import com.ledger.valuation.domain.Portfolio;
 import io.micrometer.core.instrument.MeterRegistry;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -35,6 +36,7 @@ public class ProjectionReconciler {
     }
 
     @Scheduled(fixedDelayString = "${ledger.reconciliation.interval-ms:30000}")
+    @SchedulerLock(name = "projectionReconciler", lockAtMostFor = "PT5M", lockAtLeastFor = "PT10S")
     public void reconcile() {
         for (var view : readModel.findAll()) {
             UUID portfolioId = view.portfolioId();

@@ -1,13 +1,12 @@
 package com.ledger.valuation.infrastructure.scheduling;
 
-import com.ledger.valuation.application.port.outbound.EventStorePort;
 import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.domain.Portfolio;
 import com.ledger.valuation.domain.PortfolioLedgerEvent;
 import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
-import org.springframework.beans.factory.annotation.Value;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +15,6 @@ import java.util.UUID;
 @Component
 public class SnapshotCompactionScheduler {
 
-    private final EventStorePort eventStore;
     private final PortfolioEventStorePort portfolioEventStore;
     private final PortfolioLedgerEventFactory eventFactory;
     private final LedgerWriteUnitOfWorkPort unitOfWork;
@@ -25,29 +23,27 @@ public class SnapshotCompactionScheduler {
     private final boolean enabled;
 
     public SnapshotCompactionScheduler(
-            EventStorePort eventStore,
             PortfolioEventStorePort portfolioEventStore,
             PortfolioLedgerEventFactory eventFactory,
             LedgerWriteUnitOfWorkPort unitOfWork,
             OutboxPort outbox,
-            @Value("${ledger.snapshot.compaction-threshold:1000}") long compactionThreshold,
-            @Value("${ledger.snapshot.enabled:false}") boolean enabled
+            com.ledger.valuation.infrastructure.config.LedgerProperties ledgerProperties
     ) {
-        this.eventStore = eventStore;
         this.portfolioEventStore = portfolioEventStore;
         this.eventFactory = eventFactory;
         this.unitOfWork = unitOfWork;
         this.outbox = outbox;
-        this.compactionThreshold = compactionThreshold;
-        this.enabled = enabled;
+        this.compactionThreshold = ledgerProperties.snapshot().compactionThreshold();
+        this.enabled = ledgerProperties.snapshot().enabled();
     }
 
     @Scheduled(cron = "${ledger.snapshot.cron:0 30 3 * * SUN}")
+    @SchedulerLock(name = "snapshotCompaction", lockAtMostFor = "PT2H", lockAtLeastFor = "PT5M")
     public void compactLongStreams() {
         if (!enabled) {
             return;
         }
-        for (UUID portfolioId : eventStore.listAggregateIds()) {
+        for (UUID portfolioId : portfolioEventStore.listPortfolioIds()) {
             var stream = portfolioEventStore.loadStream(portfolioId);
             if (stream.size() < compactionThreshold) {
                 continue;

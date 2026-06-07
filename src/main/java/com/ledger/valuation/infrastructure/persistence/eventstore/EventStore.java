@@ -15,4 +15,6 @@ public interface EventStore {
     boolean existsByAggregateIdAndSequenceNumber(UUID aggregateId, long sequenceNumber);
 
     List<UUID> listAggregateIds();
+
+    List<UUID> listPortfolioAggregateIds();
 }

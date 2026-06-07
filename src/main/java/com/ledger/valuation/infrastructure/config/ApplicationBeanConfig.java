@@ -12,24 +12,23 @@ import com.ledger.valuation.application.port.inbound.QueryAccountValueUseCase;
 import com.ledger.valuation.application.port.inbound.QueryAuditExportUseCase;
 import com.ledger.valuation.application.port.inbound.QueryAuditTrailUseCase;
 import com.ledger.valuation.application.port.inbound.RebuildPortfolioReadSideUseCase;
-import com.ledger.valuation.application.port.inbound.RebuildReadSideUseCase;
 import com.ledger.valuation.application.port.inbound.RegisterPositionUseCase;
-import com.ledger.valuation.application.port.outbound.AccountValueProjectionPort;
 import com.ledger.valuation.application.port.outbound.AccountValueReadModelPort;
 import com.ledger.valuation.application.port.outbound.AsOfReplayCachePort;
-import com.ledger.valuation.application.port.outbound.EventStorePort;
+import com.ledger.valuation.application.port.outbound.AuditExportJobPort;
+import com.ledger.valuation.application.port.outbound.CommandIdempotencyPort;
 import com.ledger.valuation.application.port.outbound.InstrumentPositionRegistryPort;
+import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
-import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
 import com.ledger.valuation.application.port.outbound.TenantPolicyPort;
+import com.ledger.valuation.application.port.outbound.TenantPortfolioRegistryPort;
 import com.ledger.valuation.application.service.AccrualPostingService;
 import com.ledger.valuation.application.service.ApplyMarketTickService;
 import com.ledger.valuation.application.service.AuditTrailQueryService;
-import com.ledger.valuation.application.service.CommandProcessingService;
 import com.ledger.valuation.application.service.CommitTransactionCommandHandler;
 import com.ledger.valuation.application.service.CreateAuditExportService;
-import com.ledger.valuation.application.service.EventProjectionService;
+import com.ledger.valuation.application.service.InstrumentPositionProjectionService;
 import com.ledger.valuation.application.service.ManageTenantPolicyService;
 import com.ledger.valuation.application.service.MarketTickValuationService;
 import com.ledger.valuation.application.service.OpenPortfolioCommandHandler;
@@ -39,13 +38,9 @@ import com.ledger.valuation.application.service.QueryAccountValueAsOfService;
 import com.ledger.valuation.application.service.QueryAccountValueDashboardService;
 import com.ledger.valuation.application.service.QueryAccountValueService;
 import com.ledger.valuation.application.service.QueryAuditExportService;
-import com.ledger.valuation.application.service.ReadSideRebuildService;
 import com.ledger.valuation.application.service.RegisterPositionCommandHandler;
 import com.ledger.valuation.application.service.TenantAccessService;
 import com.ledger.valuation.application.service.UnifiedLedgerCommandHandler;
-import com.ledger.valuation.application.port.outbound.AuditExportJobPort;
-import com.ledger.valuation.application.port.outbound.TenantPortfolioRegistryPort;
-import com.ledger.valuation.domain.LedgerEventFactory;
 import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.annotation.Bean;
@@ -69,11 +64,6 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
-    public LedgerEventFactory ledgerEventFactory() {
-        return new LedgerEventFactory();
-    }
-
-    @Bean
     public PortfolioLedgerEventFactory portfolioLedgerEventFactory(Clock clock, Supplier<UUID> uuidSupplier) {
         return new PortfolioLedgerEventFactory(clock, uuidSupplier);
     }
@@ -86,8 +76,18 @@ public class ApplicationBeanConfig {
     }
 
     @Bean
-    public TenantAccessService tenantAccessService(TenantPortfolioRegistryPort tenantRegistry) {
-        return new TenantAccessService(tenantRegistry);
+    public InstrumentPositionProjectionService instrumentPositionProjectionService(
+            InstrumentPositionRegistryPort positionRegistry
+    ) {
+        return new InstrumentPositionProjectionService(positionRegistry);
+    }
+
+    @Bean
+    public TenantAccessService tenantAccessService(
+            TenantPortfolioRegistryPort tenantRegistry,
+            LedgerProperties ledgerProperties
+    ) {
+        return new TenantAccessService(tenantRegistry, ledgerProperties.tenant().enforcement());
     }
 
     @Bean
@@ -95,9 +95,12 @@ public class ApplicationBeanConfig {
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
             PortfolioLedgerEventFactory eventFactory,
-            OutboxPort outbox
+            OutboxPort outbox,
+            CommandIdempotencyPort idempotencyPort
     ) {
-        return new OpenPortfolioCommandHandler(unitOfWork, portfolioEventStore, eventFactory, outbox);
+        return new OpenPortfolioCommandHandler(
+                unitOfWork, portfolioEventStore, eventFactory, outbox, idempotencyPort
+        );
     }
 
     @Bean
@@ -109,11 +112,7 @@ public class ApplicationBeanConfig {
             TenantPolicyPort tenantPolicyPort
     ) {
         return new CommitTransactionCommandHandler(
-                unitOfWork,
-                portfolioEventStore,
-                eventFactory,
-                outbox,
-                tenantPolicyPort
+                unitOfWork, portfolioEventStore, eventFactory, outbox, tenantPolicyPort
         );
     }
 
@@ -121,20 +120,13 @@ public class ApplicationBeanConfig {
     public RegisterPositionUseCase registerPositionUseCase(
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort portfolioEventStore,
-            PortfolioLedgerEventFactory eventFactory,
             OutboxPort outbox,
-            InstrumentPositionRegistryPort positionRegistry,
+            CommandIdempotencyPort idempotencyPort,
             Clock clock,
             Supplier<UUID> uuidSupplier
     ) {
         return new RegisterPositionCommandHandler(
-                unitOfWork,
-                portfolioEventStore,
-                eventFactory,
-                outbox,
-                positionRegistry,
-                clock,
-                uuidSupplier
+                unitOfWork, portfolioEventStore, outbox, idempotencyPort, clock, uuidSupplier
         );
     }
 
@@ -173,21 +165,6 @@ public class ApplicationBeanConfig {
             OutboxPort outbox
     ) {
         return new AccrualPostingService(unitOfWork, portfolioEventStore, eventFactory, outbox);
-    }
-
-    @Bean
-    public EventProjectionService eventProjectionService(AccountValueProjectionPort projectionPort) {
-        return new EventProjectionService(projectionPort);
-    }
-
-    @Bean
-    @Deprecated
-    public CommandProcessingService legacyCommandProcessingService(
-            LedgerEventFactory eventFactory,
-            EventStorePort eventStore,
-            EventProjectionService projectionService
-    ) {
-        return new CommandProcessingService(eventFactory, eventStore, projectionService);
     }
 
     @Bean
@@ -240,17 +217,11 @@ public class ApplicationBeanConfig {
     @Bean
     public RebuildPortfolioReadSideUseCase rebuildPortfolioReadSideUseCase(
             PortfolioEventStorePort portfolioEventStore,
-            EventStorePort eventStore,
-            PortfolioLedgerEventProjectionService projectionService
+            PortfolioLedgerEventProjectionService projectionService,
+            InstrumentPositionProjectionService positionProjectionService
     ) {
-        return new PortfolioReadSideRebuildService(portfolioEventStore, eventStore, projectionService);
-    }
-
-    @Bean
-    public RebuildReadSideUseCase rebuildReadSideUseCase(
-            EventStorePort eventStore,
-            EventProjectionService projectionService
-    ) {
-        return new ReadSideRebuildService(eventStore, projectionService);
+        return new PortfolioReadSideRebuildService(
+                portfolioEventStore, projectionService, positionProjectionService
+        );
     }
 }

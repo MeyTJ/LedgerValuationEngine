@@ -27,7 +27,8 @@ public final class PortfolioLedgerEventFactory {
                 command.accountCode(),
                 command.currency(),
                 command.tenantId(),
-                PortfolioStatus.ACTIVE
+                PortfolioStatus.ACTIVE,
+                command.idempotencyToken()
         );
     }
 
@@ -59,6 +60,7 @@ public final class PortfolioLedgerEventFactory {
                 clock.instant(),
                 tick.instrumentId(),
                 markToMarketDeltaMinorUnits,
+                tick.priceMinorUnits(),
                 tick.valuationRunId()
         );
     }

@@ -9,11 +9,15 @@ public interface OutboxPort {
 
     void enqueue(PortfolioLedgerEvent event);
 
-    List<OutboxEntry> fetchPending(int limit);
+    List<OutboxEntry> claimPending(int limit, String claimedBy);
 
     void markPublished(UUID outboxId);
 
     void incrementRetry(UUID outboxId);
+
+    void markFailed(UUID outboxId);
+
+    long countPending();
 
     record OutboxEntry(UUID id, UUID aggregateId, String eventType, String payload) {}
 }

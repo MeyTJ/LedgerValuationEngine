@@ -1,5 +1,7 @@
 package com.ledger.valuation.application.readmodel;
 
+import com.ledger.valuation.domain.Portfolio;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -26,6 +28,18 @@ public record AccountValueDashboardView(
                 nextAccountValueMinorUnits,
                 sequenceNumber,
                 updatedAt
+        );
+    }
+
+    public static AccountValueDashboardView fromPortfolio(Portfolio portfolio, Instant lastUpdatedAt) {
+        return new AccountValueDashboardView(
+                portfolio.portfolioId(),
+                portfolio.accountCode(),
+                portfolio.tenantId(),
+                portfolio.accountValueCurrency(),
+                portfolio.accountValueMinorUnits(),
+                portfolio.lastSequenceNumber(),
+                lastUpdatedAt
         );
     }
 }

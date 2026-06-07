@@ -1,0 +1,12 @@
+ledger:
+  readside:
+    local-only: true
+  security:
+    enabled: false
+  tenant:
+    enforcement: false
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0

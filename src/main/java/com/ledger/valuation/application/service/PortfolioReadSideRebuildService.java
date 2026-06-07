@@ -1,43 +1,38 @@
 package com.ledger.valuation.application.service;
 
 import com.ledger.valuation.application.port.inbound.RebuildPortfolioReadSideUseCase;
-import com.ledger.valuation.application.port.outbound.EventStorePort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
-import com.ledger.valuation.domain.PortfolioLedgerEvent;
 
 import java.util.UUID;
 
 public final class PortfolioReadSideRebuildService implements RebuildPortfolioReadSideUseCase {
 
     private final PortfolioEventStorePort portfolioEventStore;
-    private final EventStorePort legacyEventStore;
     private final PortfolioLedgerEventProjectionService projectionService;
+    private final InstrumentPositionProjectionService positionProjectionService;
 
     public PortfolioReadSideRebuildService(
             PortfolioEventStorePort portfolioEventStore,
-            EventStorePort legacyEventStore,
-            PortfolioLedgerEventProjectionService projectionService
+            PortfolioLedgerEventProjectionService projectionService,
+            InstrumentPositionProjectionService positionProjectionService
     ) {
         this.portfolioEventStore = portfolioEventStore;
-        this.legacyEventStore = legacyEventStore;
         this.projectionService = projectionService;
+        this.positionProjectionService = positionProjectionService;
     }
 
     @Override
     public void rebuildPortfolio(UUID portfolioId) {
-        for (PortfolioLedgerEvent event : portfolioEventStore.loadStream(portfolioId).eventRecords()) {
+        for (var event : portfolioEventStore.loadStream(portfolioId).eventRecords()) {
             projectionService.project(event);
+            positionProjectionService.project(event);
         }
     }
 
     @Override
     public void rebuildAll() {
-        for (UUID aggregateId : legacyEventStore.listAggregateIds()) {
-            try {
-                rebuildPortfolio(aggregateId);
-            } catch (RuntimeException ignored) {
-                // Skip non-portfolio legacy aggregates during full rebuild scan
-            }
+        for (UUID portfolioId : portfolioEventStore.listPortfolioIds()) {
+            rebuildPortfolio(portfolioId);
         }
     }
 }

@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS shedlock (
+    name STRING NOT NULL PRIMARY KEY,
+    lock_until TIMESTAMPTZ NOT NULL,
+    locked_at TIMESTAMPTZ NOT NULL,
+    locked_by STRING NOT NULL
+);

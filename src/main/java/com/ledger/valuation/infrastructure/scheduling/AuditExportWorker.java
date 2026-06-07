@@ -7,6 +7,7 @@ import com.ledger.valuation.application.readmodel.AuditEventRecord;
 import com.ledger.valuation.application.service.AuditManifestBuilder;
 import com.ledger.valuation.domain.AuditExportJob;
 import com.ledger.valuation.domain.AuditExportJobStatus;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +40,7 @@ public class AuditExportWorker {
     }
 
     @Scheduled(fixedDelayString = "${ledger.audit.export.worker-interval-ms:5000}")
+    @SchedulerLock(name = "auditExportWorker", lockAtMostFor = "PT10M", lockAtLeastFor = "PT5S")
     public void processPendingExports() {
         for (AuditExportJob job : jobPort.findByStatus(AuditExportJobStatus.PENDING, batchSize)) {
             try {

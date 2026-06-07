@@ -36,9 +36,7 @@ public class AccountValueAsOfController {
             @RequestHeader(value = "X-Tenant-Id", required = false) String tenantId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant asOf
     ) {
-        if (tenantId != null) {
-            tenantAccessService.assertPortfolioBelongsToTenant(portfolioId, tenantId);
-        }
+        tenantAccessService.assertTenantContext(portfolioId, tenantId);
         return asOfUseCase.getAsOf(portfolioId, asOf)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());

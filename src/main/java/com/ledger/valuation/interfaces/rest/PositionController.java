@@ -3,6 +3,10 @@ package com.ledger.valuation.interfaces.rest;
 import com.ledger.valuation.application.port.inbound.RegisterPositionUseCase;
 import com.ledger.valuation.application.service.TenantAccessService;
 import com.ledger.valuation.domain.RegisterPositionCommand;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,11 +36,9 @@ public class PositionController {
     public ResponseEntity<RegisterPositionResponse> register(
             @PathVariable UUID portfolioId,
             @RequestHeader(value = "X-Tenant-Id", required = false) String tenantId,
-            @RequestBody RegisterPositionRequest request
+            @Valid @RequestBody RegisterPositionRequest request
     ) {
-        if (tenantId != null) {
-            tenantAccessService.assertPortfolioBelongsToTenant(portfolioId, tenantId);
-        }
+        tenantAccessService.assertTenantContext(portfolioId, tenantId);
         UUID eventId = registerPositionUseCase.handle(new RegisterPositionCommand(
                 request.idempotencyToken(),
                 portfolioId,
@@ -48,10 +50,10 @@ public class PositionController {
     }
 
     public record RegisterPositionRequest(
-            String idempotencyToken,
-            String instrumentId,
-            long quantityMinorUnits,
-            long costBasisMinorUnits
+            @NotBlank @Size(max = 128) String idempotencyToken,
+            @NotBlank String instrumentId,
+            @PositiveOrZero long quantityMinorUnits,
+            @PositiveOrZero long costBasisMinorUnits
     ) {}
 
     public record RegisterPositionResponse(UUID portfolioId, String instrumentId, UUID eventId) {}

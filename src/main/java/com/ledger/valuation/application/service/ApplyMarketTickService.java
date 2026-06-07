@@ -64,7 +64,6 @@ public final class ApplyMarketTickService implements ApplyMarketTickUseCase {
             PortfolioLedgerEvent event = eventFactory.createMarkToMarket(portfolio, tick, delta);
             eventStore.append(event);
             outbox.enqueue(event);
-            positionRegistry.updateMark(portfolioId, tick.instrumentId(), tick.priceMinorUnits());
             return null;
         });
     }

@@ -25,6 +25,7 @@ spring:
       concurrency: ${KAFKA_LISTENER_CONCURRENCY:4}
 
 server:
+  shutdown: graceful
   tomcat:
     accept-count: ${TOMCAT_ACCEPT_COUNT:1000}
     connection-timeout: 5s
@@ -44,19 +45,23 @@ ledger:
     cache:
       max-entries: ${READ_CACHE_MAX_ENTRIES:100000}
       expire-after-write: ${READ_CACHE_TTL:PT1H}
-    local-only: true
+    local-only: ${READ_MODEL_LOCAL_ONLY:false}
     warmup-on-startup: ${READ_MODEL_WARMUP:true}
   tomcat:
     max-connections: ${TOMCAT_MAX_CONNECTIONS:10000}
   outbox:
     batch-size: ${OUTBOX_BATCH_SIZE:100}
     relay-interval-ms: ${OUTBOX_RELAY_INTERVAL_MS:500}
+    relay-interval: ${OUTBOX_RELAY_INTERVAL:PT0.5S}
+    max-retries: ${OUTBOX_MAX_RETRIES:10}
+    claim-timeout: ${OUTBOX_CLAIM_TIMEOUT:PT5M}
   cockroach:
     retry:
       max-attempts: ${COCKROACH_RETRY_MAX:5}
       base-backoff-ms: ${COCKROACH_RETRY_BACKOFF_MS:25}
   reconciliation:
     interval-ms: ${RECONCILIATION_INTERVAL_MS:30000}
+    interval: ${RECONCILIATION_INTERVAL:PT30S}
   accrual:
     enabled: ${ACCRUAL_ENABLED:false}
     cron: ${ACCRUAL_CRON:0 0 2 * * *}
@@ -78,6 +83,7 @@ ledger:
       storage-path: ${AUDIT_EXPORT_PATH:./data/audit-exports}
       batch-size: ${AUDIT_EXPORT_BATCH_SIZE:10}
       worker-interval-ms: ${AUDIT_EXPORT_WORKER_INTERVAL_MS:5000}
+      worker-interval: ${AUDIT_EXPORT_WORKER_INTERVAL:PT5S}
   stream:
     max-connections: ${SSE_MAX_CONNECTIONS:500}
   tenant:
@@ -88,9 +94,19 @@ management:
     web:
       exposure:
         include: health,prometheus,metrics,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
   tracing:
     sampling:
-      probability: 1.0
+      probability: ${TRACING_SAMPLE_RATE:0.1}
   otlp:
     tracing:
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
@@ -98,6 +114,14 @@ management:
     tags:
       application: ${spring.application.name}
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
 logging:
   level:
     com.ledger.valuation: INFO
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

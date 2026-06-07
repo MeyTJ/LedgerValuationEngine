@@ -1,14 +1,12 @@
 package com.ledger.valuation.application.service;
 
 import com.ledger.valuation.application.port.inbound.RegisterPositionUseCase;
-import com.ledger.valuation.application.port.outbound.InstrumentPositionRegistryPort;
+import com.ledger.valuation.application.port.outbound.CommandIdempotencyPort;
 import com.ledger.valuation.application.port.outbound.LedgerWriteUnitOfWorkPort;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
-import com.ledger.valuation.domain.InstrumentPosition;
 import com.ledger.valuation.domain.Portfolio;
 import com.ledger.valuation.domain.PortfolioLedgerEvent;
-import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
 import com.ledger.valuation.domain.PortfolioLedgerEventStream;
 import com.ledger.valuation.domain.PortfolioNotFoundException;
 import com.ledger.valuation.domain.RegisterPositionCommand;
@@ -19,28 +17,27 @@ import java.util.function.Supplier;
 
 public final class RegisterPositionCommandHandler implements RegisterPositionUseCase {
 
+    private static final String COMMAND_TYPE = "RegisterPosition";
+
     private final LedgerWriteUnitOfWorkPort unitOfWork;
     private final PortfolioEventStorePort eventStore;
-    private final PortfolioLedgerEventFactory eventFactory;
     private final OutboxPort outbox;
-    private final InstrumentPositionRegistryPort positionRegistry;
+    private final CommandIdempotencyPort idempotencyPort;
     private final Clock clock;
     private final Supplier<UUID> idSupplier;
 
     public RegisterPositionCommandHandler(
             LedgerWriteUnitOfWorkPort unitOfWork,
             PortfolioEventStorePort eventStore,
-            PortfolioLedgerEventFactory eventFactory,
             OutboxPort outbox,
-            InstrumentPositionRegistryPort positionRegistry,
+            CommandIdempotencyPort idempotencyPort,
             Clock clock,
             Supplier<UUID> idSupplier
     ) {
         this.unitOfWork = unitOfWork;
         this.eventStore = eventStore;
-        this.eventFactory = eventFactory;
         this.outbox = outbox;
-        this.positionRegistry = positionRegistry;
+        this.idempotencyPort = idempotencyPort;
         this.clock = clock;
         this.idSupplier = idSupplier;
     }
@@ -48,6 +45,16 @@ public final class RegisterPositionCommandHandler implements RegisterPositionUse
     @Override
     public UUID handle(RegisterPositionCommand command) {
         return unitOfWork.execute(() -> {
+            var existing = idempotencyPort.findByToken(command.idempotencyToken());
+            if (existing.isPresent()) {
+                if (!existing.get().aggregateId().equals(command.portfolioId())) {
+                    throw new IllegalStateException(
+                            "idempotencyToken already bound to portfolio " + existing.get().aggregateId()
+                    );
+                }
+                return existing.get().resultEventId();
+            }
+
             Portfolio portfolio = rehydrate(command.portfolioId());
             portfolio.ensureActive();
             PortfolioLedgerEvent event = new PortfolioLedgerEvent.PositionOpened(
@@ -57,16 +64,17 @@ public final class RegisterPositionCommandHandler implements RegisterPositionUse
                     clock.instant(),
                     command.instrumentId(),
                     command.quantityMinorUnits(),
-                    command.costBasisMinorUnits()
+                    command.costBasisMinorUnits(),
+                    command.idempotencyToken()
             );
             eventStore.append(event);
             outbox.enqueue(event);
-            positionRegistry.register(command.portfolioId(), new InstrumentPosition(
-                    command.instrumentId(),
-                    command.quantityMinorUnits(),
-                    command.costBasisMinorUnits(),
-                    command.costBasisMinorUnits()
-            ));
+            idempotencyPort.record(
+                    command.idempotencyToken(),
+                    COMMAND_TYPE,
+                    command.portfolioId(),
+                    event.eventId()
+            );
             return event.eventId();
         });
     }

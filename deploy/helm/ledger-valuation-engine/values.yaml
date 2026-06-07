@@ -17,12 +17,15 @@ resources:
     cpu: "2"
     memory: 2Gi
 
-env:
-  COCKROACH_HOST: cockroachdb
-  COCKROACH_PORT: "26257"
-  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-  READ_MODEL_WARMUP: "true"
-  SHARD_COUNT: "16"
+  env:
+    COCKROACH_HOST: cockroachdb
+    COCKROACH_PORT: "26257"
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    READ_MODEL_WARMUP: "true"
+    READ_MODEL_LOCAL_ONLY: "false"
+    SHARD_COUNT: "16"
+    TENANT_ENFORCEMENT: "true"
+    SECURITY_ENABLED: "true"
 
 autoscaling:
   enabled: true

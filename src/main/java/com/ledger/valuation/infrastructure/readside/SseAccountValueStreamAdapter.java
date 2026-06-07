@@ -1,7 +1,8 @@
 package com.ledger.valuation.infrastructure.readside;
 
+import com.ledger.valuation.application.port.outbound.AccountValueStreamPort;
 import com.ledger.valuation.application.readmodel.AccountValueDashboardView;
-import org.springframework.beans.factory.annotation.Value;
+import com.ledger.valuation.infrastructure.config.LedgerProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -11,19 +12,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Component
-public class AccountValueStreamPublisher {
+public class SseAccountValueStreamAdapter implements AccountValueStreamPort {
 
     private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
     private final ConcurrentHashMap<SseEmitter, String> emitterTenants = new ConcurrentHashMap<>();
     private final int maxConnections;
 
-    public AccountValueStreamPublisher(
-            @Value("${ledger.stream.max-connections:500}") int maxConnections
-    ) {
-        this.maxConnections = maxConnections;
+    public SseAccountValueStreamAdapter(LedgerProperties ledgerProperties) {
+        this.maxConnections = ledgerProperties.stream().maxConnections();
     }
 
-    public SseEmitter subscribe(String tenantId) {
+    @Override
+    public StreamSubscription subscribe(String tenantId) {
         if (emitters.size() >= maxConnections) {
             throw new IllegalStateException("Maximum SSE connections reached");
         }
@@ -33,9 +33,10 @@ public class AccountValueStreamPublisher {
         emitter.onTimeout(() -> removeEmitter(emitter));
         emitter.onError(_ -> removeEmitter(emitter));
         emitters.add(emitter);
-        return emitter;
+        return () -> emitter;
     }
 
+    @Override
     public void publish(AccountValueDashboardView view) {
         for (SseEmitter emitter : emitters) {
             String subscribedTenant = emitterTenants.get(emitter);

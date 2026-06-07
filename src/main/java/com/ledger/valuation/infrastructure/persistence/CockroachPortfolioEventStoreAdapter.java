@@ -39,9 +39,18 @@ public class CockroachPortfolioEventStoreAdapter implements PortfolioEventStoreP
     public Optional<PortfolioLedgerEvent.TransactionCommitted> findTransactionCommittedByIdempotencyToken(
             String idempotencyToken
     ) {
-        return eventStore.findByIdempotencyToken(idempotencyToken)
-                .map(this::deserialize)
+        return findEventByIdempotencyToken(idempotencyToken)
                 .flatMap(this::asTransactionCommitted);
+    }
+
+    @Override
+    public Optional<PortfolioLedgerEvent> findEventByIdempotencyToken(String idempotencyToken) {
+        return eventStore.findByIdempotencyToken(idempotencyToken).map(this::deserialize);
+    }
+
+    @Override
+    public List<UUID> listPortfolioIds() {
+        return eventStore.listPortfolioAggregateIds();
     }
 
     @Override
@@ -71,9 +80,6 @@ public class CockroachPortfolioEventStoreAdapter implements PortfolioEventStoreP
 
     private StoredEventRecord toStoredRecord(PortfolioLedgerEvent event) {
         try {
-            String idempotencyToken = event instanceof PortfolioLedgerEvent.TransactionCommitted committed
-                    ? committed.idempotencyToken()
-                    : null;
             return new StoredEventRecord(
                     event.eventId(),
                     event.portfolioId(),
@@ -81,10 +87,19 @@ public class CockroachPortfolioEventStoreAdapter implements PortfolioEventStoreP
                     event.getClass().getSimpleName(),
                     objectMapper.writeValueAsString(event),
                     event.occurredAt(),
-                    idempotencyToken
+                    extractIdempotencyToken(event)
             );
         } catch (JsonProcessingException ex) {
             throw new IllegalArgumentException("Unable to serialize portfolio event " + event.eventId(), ex);
         }
+    }
+
+    private static String extractIdempotencyToken(PortfolioLedgerEvent event) {
+        return switch (event) {
+            case PortfolioLedgerEvent.TransactionCommitted committed -> committed.idempotencyToken();
+            case PortfolioLedgerEvent.PortfolioAccountOpened opened -> opened.idempotencyToken();
+            case PortfolioLedgerEvent.PositionOpened opened -> opened.idempotencyToken();
+            default -> null;
+        };
     }
 }

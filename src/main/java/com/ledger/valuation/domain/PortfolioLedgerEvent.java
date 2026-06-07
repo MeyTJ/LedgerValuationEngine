@@ -25,6 +25,10 @@ public sealed interface PortfolioLedgerEvent permits
 
     Instant occurredAt();
 
+    default int schemaVersion() {
+        return 1;
+    }
+
     record PortfolioAccountOpened(
             UUID eventId,
             UUID portfolioId,
@@ -33,7 +37,8 @@ public sealed interface PortfolioLedgerEvent permits
             String accountCode,
             String currency,
             String tenantId,
-            PortfolioStatus status
+            PortfolioStatus status,
+            String idempotencyToken
     ) implements PortfolioLedgerEvent {}
 
     record TransactionCommitted(
@@ -83,6 +88,7 @@ public sealed interface PortfolioLedgerEvent permits
             Instant occurredAt,
             String instrumentId,
             long markToMarketDeltaMinorUnits,
+            long markPriceMinorUnits,
             String valuationRunId
     ) implements PortfolioLedgerEvent {}
 
@@ -133,7 +139,8 @@ public sealed interface PortfolioLedgerEvent permits
             Instant occurredAt,
             String instrumentId,
             long quantityMinorUnits,
-            long costBasisMinorUnits
+            long costBasisMinorUnits,
+            String idempotencyToken
     ) implements PortfolioLedgerEvent {}
 
     record PolicyEvaluated(

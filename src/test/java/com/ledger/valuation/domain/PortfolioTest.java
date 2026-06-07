@@ -18,7 +18,8 @@ class PortfolioTest {
 
         var events = List.<PortfolioLedgerEvent>of(
                 new PortfolioLedgerEvent.PortfolioAccountOpened(
-                        UUID.randomUUID(), portfolioId, 1L, now, "ACC-1", "USD", "tenant-1", PortfolioStatus.ACTIVE
+                        UUID.randomUUID(), portfolioId, 1L, now, "ACC-1", "USD", "tenant-1",
+                        PortfolioStatus.ACTIVE, "open-token"
                 ),
                 new PortfolioLedgerEvent.TransactionCommitted(
                         UUID.randomUUID(), portfolioId, 2L, now.plusSeconds(1),
@@ -36,7 +37,8 @@ class PortfolioTest {
         Instant now = Instant.now();
         var events = List.<PortfolioLedgerEvent>of(
                 new PortfolioLedgerEvent.PortfolioAccountOpened(
-                        UUID.randomUUID(), portfolioId, 1L, now, "ACC-1", "USD", "tenant-1", PortfolioStatus.ACTIVE
+                        UUID.randomUUID(), portfolioId, 1L, now, "ACC-1", "USD", "tenant-1",
+                        PortfolioStatus.ACTIVE, "open-token"
                 ),
                 new PortfolioLedgerEvent.TransactionCommitted(
                         UUID.randomUUID(), portfolioId, 2L, now.plusSeconds(1),

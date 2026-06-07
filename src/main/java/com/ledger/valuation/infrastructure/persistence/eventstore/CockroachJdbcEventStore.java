@@ -56,6 +56,13 @@ public class CockroachJdbcEventStore implements EventStore {
             ORDER BY aggregate_id
             """;
 
+    static final String LIST_PORTFOLIO_AGGREGATE_IDS_SQL = """
+            SELECT DISTINCT aggregate_id
+            FROM event_store
+            WHERE event_type LIKE 'Portfolio%'
+            ORDER BY aggregate_id
+            """;
+
     private final DataSource dataSource;
 
     public CockroachJdbcEventStore(DataSource dataSource) {
@@ -129,11 +136,20 @@ public class CockroachJdbcEventStore implements EventStore {
 
     @Override
     public List<UUID> listAggregateIds() {
-        EventStoreSqlGuard.assertReadOnlySelect(LIST_AGGREGATE_IDS_SQL);
+        return queryAggregateIds(LIST_AGGREGATE_IDS_SQL);
+    }
+
+    @Override
+    public List<UUID> listPortfolioAggregateIds() {
+        return queryAggregateIds(LIST_PORTFOLIO_AGGREGATE_IDS_SQL);
+    }
+
+    private List<UUID> queryAggregateIds(String sql) {
+        EventStoreSqlGuard.assertReadOnlySelect(sql);
         Connection connection = DataSourceUtils.getConnection(dataSource);
         try {
             enforceSerializableIsolation(connection);
-            try (PreparedStatement statement = connection.prepareStatement(LIST_AGGREGATE_IDS_SQL);
+            try (PreparedStatement statement = connection.prepareStatement(sql);
                  ResultSet resultSet = statement.executeQuery()) {
                 var ids = new ArrayList<UUID>();
                 while (resultSet.next()) {

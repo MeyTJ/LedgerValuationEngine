@@ -121,6 +121,29 @@ public final class Portfolio {
         return applyEventRecord(committed);
     }
 
+    public Portfolio applyEvent(PortfolioLedgerEvent eventRecord) {
+        return applyEventRecord(eventRecord);
+    }
+
+    public static Portfolio fromReadModelState(
+            UUID portfolioId,
+            String accountCode,
+            String tenantId,
+            String currency,
+            long accountValueMinorUnits,
+            PortfolioStatus status,
+            long lastSequenceNumber
+    ) {
+        return new Portfolio(
+                portfolioId,
+                accountCode,
+                tenantId,
+                new AccountValue(currency, accountValueMinorUnits),
+                status,
+                lastSequenceNumber
+        );
+    }
+
     private static Portfolio openFromFirstEventRecord(PortfolioLedgerEvent eventRecord) {
         if (!(eventRecord instanceof PortfolioLedgerEvent.PortfolioAccountOpened opened)) {
             throw new IllegalStateException(

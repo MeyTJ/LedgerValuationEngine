@@ -1,6 +1,8 @@
 package com.ledger.valuation.infrastructure.readside;
 
 import com.ledger.valuation.application.port.outbound.AccountValueReadModelPort;
+import com.ledger.valuation.application.port.outbound.AccountValueStreamPort;
+import com.ledger.valuation.application.service.InstrumentPositionProjectionService;
 import com.ledger.valuation.application.service.PortfolioLedgerEventProjectionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,20 +16,20 @@ public class ReactiveLedgerEventProjectionListener {
     private static final Logger log = LoggerFactory.getLogger(ReactiveLedgerEventProjectionListener.class);
 
     private final PortfolioLedgerEventProjectionService projectionService;
-    private final ReadModelFederationWriter federationWriter;
+    private final InstrumentPositionProjectionService positionProjectionService;
     private final AccountValueReadModelPort readModel;
-    private final AccountValueStreamPublisher streamPublisher;
+    private final AccountValueStreamPort streamPort;
 
     public ReactiveLedgerEventProjectionListener(
             PortfolioLedgerEventProjectionService projectionService,
-            ReadModelFederationWriter federationWriter,
+            InstrumentPositionProjectionService positionProjectionService,
             AccountValueReadModelPort readModel,
-            AccountValueStreamPublisher streamPublisher
+            AccountValueStreamPort streamPort
     ) {
         this.projectionService = projectionService;
-        this.federationWriter = federationWriter;
+        this.positionProjectionService = positionProjectionService;
         this.readModel = readModel;
-        this.streamPublisher = streamPublisher;
+        this.streamPort = streamPort;
     }
 
     @Async("ledgerProjectionExecutor")
@@ -41,9 +43,7 @@ public class ReactiveLedgerEventProjectionListener {
                 eventRecord.sequenceNumber()
         );
         projectionService.project(eventRecord);
-        readModel.findByPortfolioId(eventRecord.portfolioId()).ifPresent(view -> {
-            federationWriter.federate(view);
-            streamPublisher.publish(view);
-        });
+        positionProjectionService.project(eventRecord);
+        readModel.findByPortfolioId(eventRecord.portfolioId()).ifPresent(streamPort::publish);
     }
 }

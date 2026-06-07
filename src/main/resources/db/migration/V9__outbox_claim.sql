@@ -1,0 +1,5 @@
+ALTER TABLE outbox ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+ALTER TABLE outbox ADD COLUMN IF NOT EXISTS claimed_by STRING;
+ALTER TABLE outbox ADD COLUMN IF NOT EXISTS failed_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_outbox_claimed ON outbox (claimed_at) WHERE published_at IS NULL AND failed_at IS NULL;

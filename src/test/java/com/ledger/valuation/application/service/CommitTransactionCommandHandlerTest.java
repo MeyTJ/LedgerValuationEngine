@@ -4,21 +4,20 @@ import com.ledger.valuation.application.model.CommitTransactionResult;
 import com.ledger.valuation.application.port.outbound.OutboxPort;
 import com.ledger.valuation.application.port.outbound.PortfolioEventStorePort;
 import com.ledger.valuation.application.port.outbound.TenantPolicyPort;
-import com.ledger.valuation.domain.PolicyRuleType;
-import com.ledger.valuation.domain.TenantPolicy;
 import com.ledger.valuation.domain.CommitTransactionCommand;
+import com.ledger.valuation.domain.PolicyRuleType;
 import com.ledger.valuation.domain.PortfolioLedgerEvent;
 import com.ledger.valuation.domain.PortfolioLedgerEventFactory;
 import com.ledger.valuation.domain.PortfolioLedgerEventStream;
 import com.ledger.valuation.domain.PortfolioStatus;
+import com.ledger.valuation.domain.TenantPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,7 +32,8 @@ class CommitTransactionCommandHandlerTest {
                 UUID.randomUUID(), portfolioId, 2L, now, 500L, 0L, "tx", "dup-token"
         );
         var opened = new PortfolioLedgerEvent.PortfolioAccountOpened(
-                UUID.randomUUID(), portfolioId, 1L, now, "ACC", "USD", "tenant", PortfolioStatus.ACTIVE
+                UUID.randomUUID(), portfolioId, 1L, now, "ACC", "USD", "tenant",
+                PortfolioStatus.ACTIVE, "open-token"
         );
 
         var handler = new CommitTransactionCommandHandler(
@@ -59,7 +59,8 @@ class CommitTransactionCommandHandlerTest {
         UUID portfolioId = UUID.randomUUID();
         Instant now = Instant.now();
         var opened = new PortfolioLedgerEvent.PortfolioAccountOpened(
-                UUID.randomUUID(), portfolioId, 1L, now, "ACC", "USD", "tenant", PortfolioStatus.ACTIVE
+                UUID.randomUUID(), portfolioId, 1L, now, "ACC", "USD", "tenant",
+                PortfolioStatus.ACTIVE, "open-token"
         );
 
         var handler = new CommitTransactionCommandHandler(
@@ -100,6 +101,16 @@ class CommitTransactionCommandHandlerTest {
         }
 
         @Override
+        public Optional<PortfolioLedgerEvent> findEventByIdempotencyToken(String idempotencyToken) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<UUID> listPortfolioIds() {
+            return List.of();
+        }
+
+        @Override
         public void append(PortfolioLedgerEvent event) {}
     }
 
@@ -121,8 +132,8 @@ class CommitTransactionCommandHandlerTest {
         public void enqueue(PortfolioLedgerEvent event) {}
 
         @Override
-        public java.util.List<OutboxEntry> fetchPending(int limit) {
-            return java.util.List.of();
+        public List<OutboxEntry> claimPending(int limit, String claimedBy) {
+            return List.of();
         }
 
         @Override
@@ -130,5 +141,13 @@ class CommitTransactionCommandHandlerTest {
 
         @Override
         public void incrementRetry(UUID outboxId) {}
+
+        @Override
+        public void markFailed(UUID outboxId) {}
+
+        @Override
+        public long countPending() {
+            return 0L;
+        }
     }
 }

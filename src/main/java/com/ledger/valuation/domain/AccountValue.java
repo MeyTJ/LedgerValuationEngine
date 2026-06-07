@@ -19,17 +19,25 @@ public record AccountValue(String currency, long accountValueMinorUnits) {
         if (creditMinorUnits < 0L) {
             throw new IllegalArgumentException("creditMinorUnits must be non-negative");
         }
-        return new AccountValue(currency, accountValueMinorUnits + creditMinorUnits);
+        return new AccountValue(currency, Math.addExact(accountValueMinorUnits, creditMinorUnits));
     }
 
     public AccountValue applyDebit(long debitMinorUnits) {
         if (debitMinorUnits < 0L) {
             throw new IllegalArgumentException("debitMinorUnits must be non-negative");
         }
-        return new AccountValue(currency, accountValueMinorUnits - debitMinorUnits);
+        return new AccountValue(currency, Math.subtractExact(accountValueMinorUnits, debitMinorUnits));
     }
 
     public AccountValue applyAccountValueDelta(long deltaMinorUnits) {
-        return new AccountValue(currency, accountValueMinorUnits + deltaMinorUnits);
+        return new AccountValue(currency, Math.addExact(accountValueMinorUnits, deltaMinorUnits));
+    }
+
+    public Money toMoney() {
+        return new Money(currency, accountValueMinorUnits);
+    }
+
+    public static AccountValue fromMoney(Money money) {
+        return new AccountValue(money.currency(), money.minorUnits());
     }
 }

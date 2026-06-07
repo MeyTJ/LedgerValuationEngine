@@ -1,10 +1,16 @@
 package com.ledger.valuation.interfaces.rest;
 
-import com.ledger.valuation.application.port.inbound.OpenPortfolioUseCase;
 import com.ledger.valuation.application.port.inbound.CommitTransactionUseCase;
+import com.ledger.valuation.application.port.inbound.OpenPortfolioUseCase;
 import com.ledger.valuation.application.model.CommitTransactionResult;
 import com.ledger.valuation.domain.CommitTransactionCommand;
 import com.ledger.valuation.domain.OpenPortfolioCommand;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,7 +36,7 @@ public class PortfolioController {
     }
 
     @PostMapping
-    public ResponseEntity<OpenPortfolioResponse> open(@RequestBody OpenPortfolioRequest request) {
+    public ResponseEntity<OpenPortfolioResponse> open(@Valid @RequestBody OpenPortfolioRequest request) {
         UUID eventId = openPortfolioUseCase.handle(new OpenPortfolioCommand(
                 request.idempotencyToken(),
                 request.portfolioId(),
@@ -44,7 +50,7 @@ public class PortfolioController {
     @PostMapping("/{portfolioId}/transactions")
     public ResponseEntity<CommitTransactionResponse> commit(
             @PathVariable UUID portfolioId,
-            @RequestBody CommitTransactionRequest request
+            @Valid @RequestBody CommitTransactionRequest request
     ) {
         CommitTransactionResult result = commitTransactionUseCase.handle(new CommitTransactionCommand(
                 request.idempotencyToken(),
@@ -61,20 +67,20 @@ public class PortfolioController {
     }
 
     public record OpenPortfolioRequest(
-            String idempotencyToken,
-            UUID portfolioId,
-            String accountCode,
-            String currency,
-            String tenantId
+            @NotBlank @Size(max = 128) String idempotencyToken,
+            @NotNull UUID portfolioId,
+            @NotBlank @Pattern(regexp = "[A-Za-z0-9-]+") String accountCode,
+            @NotBlank @Size(min = 3, max = 3) String currency,
+            @NotBlank String tenantId
     ) {}
 
     public record OpenPortfolioResponse(UUID portfolioId, UUID eventId) {}
 
     public record CommitTransactionRequest(
-            String idempotencyToken,
-            long creditMinorUnits,
-            long debitMinorUnits,
-            String transactionReference
+            @NotBlank @Size(max = 128) String idempotencyToken,
+            @PositiveOrZero long creditMinorUnits,
+            @PositiveOrZero long debitMinorUnits,
+            @NotBlank @Size(max = 256) String transactionReference
     ) {}
 
     public record CommitTransactionResponse(
